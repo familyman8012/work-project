@@ -1,0 +1,2478 @@
+openapi: 3.0.3
+info:
+  title: Company Task Manager API
+  version: 1.0.0
+  description: API for managing company tasks and employee workflows
+paths:
+  /api/departments/:
+    get:
+      operationId: departments_list
+      tags:
+      - departments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+          description: ''
+    post:
+      operationId: departments_create
+      tags:
+      - departments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Department'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Department'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Department'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+          description: ''
+  /api/departments/{id}/:
+    get:
+      operationId: departments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 부서.
+        required: true
+      tags:
+      - departments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+          description: ''
+    put:
+      operationId: departments_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 부서.
+        required: true
+      tags:
+      - departments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Department'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Department'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Department'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+          description: ''
+    patch:
+      operationId: departments_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 부서.
+        required: true
+      tags:
+      - departments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDepartment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDepartment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDepartment'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+          description: ''
+    delete:
+      operationId: departments_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 부서.
+        required: true
+      tags:
+      - departments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/notifications/:
+    get:
+      operationId: notifications_list
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+          description: ''
+    post:
+      operationId: notifications_create
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Notification'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/{id}/:
+    get:
+      operationId: notifications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 알림.
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    put:
+      operationId: notifications_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 알림.
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Notification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Notification'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    patch:
+      operationId: notifications_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 알림.
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotification'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    delete:
+      operationId: notifications_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 알림.
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/task-attachments/:
+    get:
+      operationId: task_attachments_list
+      tags:
+      - task-attachments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskAttachment'
+          description: ''
+    post:
+      operationId: task_attachments_create
+      tags:
+      - task-attachments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskAttachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskAttachment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskAttachment'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAttachment'
+          description: ''
+  /api/task-attachments/{id}/:
+    get:
+      operationId: task_attachments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 첨부파일.
+        required: true
+      tags:
+      - task-attachments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAttachment'
+          description: ''
+    put:
+      operationId: task_attachments_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 첨부파일.
+        required: true
+      tags:
+      - task-attachments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskAttachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskAttachment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskAttachment'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAttachment'
+          description: ''
+    patch:
+      operationId: task_attachments_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 첨부파일.
+        required: true
+      tags:
+      - task-attachments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskAttachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskAttachment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskAttachment'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAttachment'
+          description: ''
+    delete:
+      operationId: task_attachments_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 첨부파일.
+        required: true
+      tags:
+      - task-attachments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/task-comments/:
+    get:
+      operationId: task_comments_list
+      tags:
+      - task-comments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskComment'
+          description: ''
+    post:
+      operationId: task_comments_create
+      tags:
+      - task-comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskComment'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskComment'
+          description: ''
+  /api/task-comments/{id}/:
+    get:
+      operationId: task_comments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 코멘트.
+        required: true
+      tags:
+      - task-comments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskComment'
+          description: ''
+    put:
+      operationId: task_comments_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 코멘트.
+        required: true
+      tags:
+      - task-comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskComment'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskComment'
+          description: ''
+    patch:
+      operationId: task_comments_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 코멘트.
+        required: true
+      tags:
+      - task-comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskComment'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskComment'
+          description: ''
+    delete:
+      operationId: task_comments_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 코멘트.
+        required: true
+      tags:
+      - task-comments
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/task-evaluations/:
+    get:
+      operationId: task_evaluations_list
+      tags:
+      - task-evaluations
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskEvaluation'
+          description: ''
+    post:
+      operationId: task_evaluations_create
+      tags:
+      - task-evaluations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskEvaluation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskEvaluation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskEvaluation'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEvaluation'
+          description: ''
+  /api/task-evaluations/{id}/:
+    get:
+      operationId: task_evaluations_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 평가.
+        required: true
+      tags:
+      - task-evaluations
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEvaluation'
+          description: ''
+    put:
+      operationId: task_evaluations_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 평가.
+        required: true
+      tags:
+      - task-evaluations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskEvaluation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskEvaluation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskEvaluation'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEvaluation'
+          description: ''
+    patch:
+      operationId: task_evaluations_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 평가.
+        required: true
+      tags:
+      - task-evaluations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskEvaluation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskEvaluation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskEvaluation'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEvaluation'
+          description: ''
+    delete:
+      operationId: task_evaluations_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 평가.
+        required: true
+      tags:
+      - task-evaluations
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/task-history/:
+    get:
+      operationId: task_history_list
+      tags:
+      - task-history
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskHistory'
+          description: ''
+    post:
+      operationId: task_history_create
+      tags:
+      - task-history
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskHistory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskHistory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskHistory'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskHistory'
+          description: ''
+  /api/task-history/{id}/:
+    get:
+      operationId: task_history_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 히스토리.
+        required: true
+      tags:
+      - task-history
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskHistory'
+          description: ''
+    put:
+      operationId: task_history_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 히스토리.
+        required: true
+      tags:
+      - task-history
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskHistory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskHistory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskHistory'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskHistory'
+          description: ''
+    patch:
+      operationId: task_history_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 히스토리.
+        required: true
+      tags:
+      - task-history
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskHistory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskHistory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskHistory'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskHistory'
+          description: ''
+    delete:
+      operationId: task_history_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 히스토리.
+        required: true
+      tags:
+      - task-history
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/task-time-logs/:
+    get:
+      operationId: task_time_logs_list
+      tags:
+      - task-time-logs
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskTimeLog'
+          description: ''
+    post:
+      operationId: task_time_logs_create
+      tags:
+      - task-time-logs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskTimeLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskTimeLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskTimeLog'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskTimeLog'
+          description: ''
+  /api/task-time-logs/{id}/:
+    get:
+      operationId: task_time_logs_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 시간 로그.
+        required: true
+      tags:
+      - task-time-logs
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskTimeLog'
+          description: ''
+    put:
+      operationId: task_time_logs_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 시간 로그.
+        required: true
+      tags:
+      - task-time-logs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskTimeLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskTimeLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskTimeLog'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskTimeLog'
+          description: ''
+    patch:
+      operationId: task_time_logs_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 시간 로그.
+        required: true
+      tags:
+      - task-time-logs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskTimeLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskTimeLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskTimeLog'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskTimeLog'
+          description: ''
+    delete:
+      operationId: task_time_logs_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업 시간 로그.
+        required: true
+      tags:
+      - task-time-logs
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/tasks/:
+    get:
+      operationId: tasks_list
+      tags:
+      - tasks
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+          description: ''
+    post:
+      operationId: tasks_create
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Task'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+  /api/tasks/{id}/:
+    get:
+      operationId: tasks_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업.
+        required: true
+      tags:
+      - tasks
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+    put:
+      operationId: tasks_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업.
+        required: true
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Task'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+    patch:
+      operationId: tasks_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업.
+        required: true
+      tags:
+      - tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTask'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTask'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTask'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+    delete:
+      operationId: tasks_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 작업.
+        required: true
+      tags:
+      - tasks
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/token/:
+    post:
+      operationId: token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      security:
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/token/refresh/:
+    post:
+      operationId: token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      security:
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/users/:
+    get:
+      operationId: users_list
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+          description: ''
+    post:
+      operationId: users_create
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/users/{id}/:
+    get:
+      operationId: users_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 사용자.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+          description: ''
+    put:
+      operationId: users_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 사용자.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 사용자.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: users_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this 사용자.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '204':
+          description: No response body
+  /api/users/me/:
+    get:
+      operationId: users_me_retrieve
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      - Bearer:
+          type: apiKey
+          name: Authorization
+          in: header
+          description: 'JWT token format: Bearer <token>'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+components:
+  schemas:
+    Department:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: 부서명
+          maxLength: 100
+        code:
+          type: string
+          title: 부서코드
+          maxLength: 10
+        parent:
+          type: integer
+          nullable: true
+          title: 상위부서
+        parent_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - code
+      - created_at
+      - id
+      - name
+      - parent_name
+      - updated_at
+    DifficultyEnum:
+      enum:
+      - EASY
+      - MEDIUM
+      - HARD
+      - VERY_HARD
+      type: string
+      description: |-
+        * `EASY` - 쉬움
+        * `MEDIUM` - 보통
+        * `HARD` - 어려움
+        * `VERY_HARD` - 매우 어려움
+    NewStatusEnum:
+      enum:
+      - TODO
+      - IN_PROGRESS
+      - REVIEW
+      - DONE
+      - HOLD
+      type: string
+      description: |-
+        * `TODO` - 예정
+        * `IN_PROGRESS` - 진행중
+        * `REVIEW` - 검토중
+        * `DONE` - 완료
+        * `HOLD` - 보류
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipient:
+          type: integer
+          title: 수신자
+        recipient_name:
+          type: string
+          readOnly: true
+        notification_type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          title: 알림 유형
+        task:
+          type: integer
+          title: 관련 작업
+        task_title:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          title: 알림 내용
+        is_read:
+          type: boolean
+          title: 읽음 여부
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - notification_type
+      - recipient
+      - recipient_name
+      - task
+      - task_title
+    NotificationTypeEnum:
+      enum:
+      - TASK_ASSIGNED
+      - TASK_STATUS_CHANGED
+      - TASK_COMMENT
+      - TASK_MENTION
+      - TASK_DUE_SOON
+      - TASK_OVERDUE
+      type: string
+      description: |-
+        * `TASK_ASSIGNED` - 작업 배정
+        * `TASK_STATUS_CHANGED` - 작업 상태 변경
+        * `TASK_COMMENT` - 작업 코멘트
+        * `TASK_MENTION` - 작업 멘션
+        * `TASK_DUE_SOON` - 작업 마감 임박
+        * `TASK_OVERDUE` - 작업 기한 초과
+    PatchedDepartment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: 부서명
+          maxLength: 100
+        code:
+          type: string
+          title: 부서코드
+          maxLength: 10
+        parent:
+          type: integer
+          nullable: true
+          title: 상위부서
+        parent_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipient:
+          type: integer
+          title: 수신자
+        recipient_name:
+          type: string
+          readOnly: true
+        notification_type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          title: 알림 유형
+        task:
+          type: integer
+          title: 관련 작업
+        task_title:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          title: 알림 내용
+        is_read:
+          type: boolean
+          title: 읽음 여부
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTask:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          title: 작업명
+          maxLength: 200
+        description:
+          type: string
+          title: 작업 설명
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NewStatusEnum'
+          title: 상태
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          title: 우선순위
+        assignee:
+          type: integer
+          title: 담당자
+        assignee_name:
+          type: string
+          readOnly: true
+        reporter:
+          type: integer
+          title: 보고자
+        reporter_name:
+          type: string
+          readOnly: true
+        department:
+          type: integer
+          title: 담당 부서
+        department_name:
+          type: string
+          readOnly: true
+        start_date:
+          type: string
+          format: date-time
+          title: 시작일
+        due_date:
+          type: string
+          format: date-time
+          title: 마감일
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: 완료일
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskComment'
+          readOnly: true
+    PatchedTaskAttachment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        file:
+          type: string
+          format: uri
+          title: 첨부파일
+        filename:
+          type: string
+          title: 파일명
+          maxLength: 255
+        uploaded_by:
+          type: integer
+          title: 업로더
+        uploaded_by_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTaskComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        author:
+          type: integer
+          title: 작성자
+        author_name:
+          type: string
+          readOnly: true
+        content:
+          type: string
+          title: 내용
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTaskEvaluation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        evaluator:
+          type: integer
+          title: 평가자
+        evaluator_name:
+          type: string
+          readOnly: true
+        difficulty:
+          allOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          title: 난이도
+        performance_score:
+          allOf:
+          - $ref: '#/components/schemas/PerformanceScoreEnum'
+          title: 수행 점수
+          minimum: -2147483648
+          maximum: 2147483647
+        feedback:
+          type: string
+          title: 피드백
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTaskHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        changed_by:
+          type: integer
+          title: 변경자
+        changed_by_name:
+          type: string
+          readOnly: true
+        previous_status:
+          allOf:
+          - $ref: '#/components/schemas/NewStatusEnum'
+          title: 이전 상태
+        new_status:
+          allOf:
+          - $ref: '#/components/schemas/NewStatusEnum'
+          title: 새로운 상태
+        comment:
+          type: string
+          title: 변경 사유
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTaskTimeLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        start_time:
+          type: string
+          format: date-time
+          title: 시작 시간
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+          title: 종료 시간
+        duration:
+          type: string
+          readOnly: true
+          nullable: true
+          title: 소요 시간
+        logged_by:
+          type: integer
+          title: 기록자
+        logged_by_name:
+          type: string
+          readOnly: true
+    PatchedUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        employee_id:
+          type: string
+          description: 사원 번호
+          maxLength: 10
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        rank:
+          $ref: '#/components/schemas/RankEnum'
+        department:
+          type: integer
+          nullable: true
+    PerformanceScoreEnum:
+      enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      type: integer
+      description: |-
+        * `1` - 1
+        * `2` - 2
+        * `3` - 3
+        * `4` - 4
+        * `5` - 5
+    PriorityEnum:
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      - URGENT
+      type: string
+      description: |-
+        * `LOW` - 낮음
+        * `MEDIUM` - 보통
+        * `HIGH` - 높음
+        * `URGENT` - 긴급
+    RankEnum:
+      enum:
+      - STAFF
+      - SENIOR
+      - ASSISTANT_MANAGER
+      - MANAGER
+      - DEPUTY_GENERAL_MANAGER
+      - GENERAL_MANAGER
+      - DIRECTOR
+      type: string
+      description: |-
+        * `STAFF` - 사원
+        * `SENIOR` - 주임
+        * `ASSISTANT_MANAGER` - 대리
+        * `MANAGER` - 과장
+        * `DEPUTY_GENERAL_MANAGER` - 차장
+        * `GENERAL_MANAGER` - 부장
+        * `DIRECTOR` - 이사
+    RoleEnum:
+      enum:
+      - EMPLOYEE
+      - MANAGER
+      - ADMIN
+      type: string
+      description: |-
+        * `EMPLOYEE` - 일반 직원
+        * `MANAGER` - 관리자
+        * `ADMIN` - 최고 관리자
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          title: 작업명
+          maxLength: 200
+        description:
+          type: string
+          title: 작업 설명
+        status:
+          allOf:
+          - $ref: '#/components/schemas/NewStatusEnum'
+          title: 상태
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          title: 우선순위
+        assignee:
+          type: integer
+          title: 담당자
+        assignee_name:
+          type: string
+          readOnly: true
+        reporter:
+          type: integer
+          title: 보고자
+        reporter_name:
+          type: string
+          readOnly: true
+        department:
+          type: integer
+          title: 담당 부서
+        department_name:
+          type: string
+          readOnly: true
+        start_date:
+          type: string
+          format: date-time
+          title: 시작일
+        due_date:
+          type: string
+          format: date-time
+          title: 마감일
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: 완료일
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskComment'
+          readOnly: true
+      required:
+      - assignee
+      - assignee_name
+      - comments
+      - created_at
+      - department
+      - department_name
+      - description
+      - due_date
+      - id
+      - reporter
+      - reporter_name
+      - start_date
+      - title
+      - updated_at
+    TaskAttachment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        file:
+          type: string
+          format: uri
+          title: 첨부파일
+        filename:
+          type: string
+          title: 파일명
+          maxLength: 255
+        uploaded_by:
+          type: integer
+          title: 업로더
+        uploaded_by_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - file
+      - filename
+      - id
+      - task
+      - uploaded_by
+      - uploaded_by_name
+    TaskComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        author:
+          type: integer
+          title: 작성자
+        author_name:
+          type: string
+          readOnly: true
+        content:
+          type: string
+          title: 내용
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - author
+      - author_name
+      - content
+      - created_at
+      - id
+      - task
+      - updated_at
+    TaskEvaluation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        evaluator:
+          type: integer
+          title: 평가자
+        evaluator_name:
+          type: string
+          readOnly: true
+        difficulty:
+          allOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          title: 난이도
+        performance_score:
+          allOf:
+          - $ref: '#/components/schemas/PerformanceScoreEnum'
+          title: 수행 점수
+          minimum: -2147483648
+          maximum: 2147483647
+        feedback:
+          type: string
+          title: 피드백
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - difficulty
+      - evaluator
+      - evaluator_name
+      - feedback
+      - id
+      - performance_score
+      - task
+    TaskHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        changed_by:
+          type: integer
+          title: 변경자
+        changed_by_name:
+          type: string
+          readOnly: true
+        previous_status:
+          allOf:
+          - $ref: '#/components/schemas/NewStatusEnum'
+          title: 이전 상태
+        new_status:
+          allOf:
+          - $ref: '#/components/schemas/NewStatusEnum'
+          title: 새로운 상태
+        comment:
+          type: string
+          title: 변경 사유
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - changed_by
+      - changed_by_name
+      - created_at
+      - id
+      - new_status
+      - previous_status
+      - task
+    TaskTimeLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        task:
+          type: integer
+          title: 작업
+        start_time:
+          type: string
+          format: date-time
+          title: 시작 시간
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+          title: 종료 시간
+        duration:
+          type: string
+          readOnly: true
+          nullable: true
+          title: 소요 시간
+        logged_by:
+          type: integer
+          title: 기록자
+        logged_by_name:
+          type: string
+          readOnly: true
+      required:
+      - duration
+      - id
+      - logged_by
+      - logged_by_name
+      - start_time
+      - task
+    TokenObtainPair:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - password
+      - refresh
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          writeOnly: true
+      required:
+      - access
+      - refresh
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        employee_id:
+          type: string
+          description: 사원 번호
+          maxLength: 10
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        rank:
+          $ref: '#/components/schemas/RankEnum'
+        department:
+          type: integer
+          nullable: true
+      required:
+      - employee_id
+      - id
+      - username
+    UserDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        employee_id:
+          type: string
+          description: 사원 번호
+          maxLength: 10
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        rank:
+          $ref: '#/components/schemas/RankEnum'
+        department:
+          type: integer
+          nullable: true
+        department_name:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - department_name
+      - employee_id
+      - id
+      - username
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
