@@ -1,6 +1,9 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from organizations.models import Department
+from rest_framework.test import APITestCase
+from rest_framework import status
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -61,3 +64,28 @@ class UserModelTest(TestCase):
             rank="MANAGER",
         )
         self.assertIn(user.rank, dict(User.RANK_CHOICES))
+
+
+class UserAPITest(APITestCase):
+    def setUp(self):
+        self.department = Department.objects.create(
+            name="테스트부서", code="TEST001"
+        )
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="test@example.com",
+            password="testpass123",
+            employee_id="EMP001",
+            department=self.department,
+            role="EMPLOYEE",
+            rank="STAFF",
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_user_profile(self):
+        url = reverse("user-detail", kwargs={"pk": self.user.pk})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["username"], "testuser")
+        self.assertEqual(response.data["email"], "test@example.com")

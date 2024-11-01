@@ -5,19 +5,16 @@ from rest_framework import status
 from django.contrib.auth import get_user_model
 from notifications.models import Notification
 from tasks.models import Task
-from organizations.models import Department, Organization
+from organizations.models import Department
 
 User = get_user_model()
 
 
 class NotificationTests(APITestCase, TransactionTestCase):
     def setUp(self):
-        # 테스트 조직 및 부서 생성
-        self.organization = Organization.objects.create(
-            name="Test Organization"
-        )
+        # 테스트 부서 생성
         self.department = Department.objects.create(
-            name="Test Department", organization=self.organization
+            name="테스트부서", code="TEST001"
         )
 
         # 테스트 사용자 생성
@@ -25,6 +22,10 @@ class NotificationTests(APITestCase, TransactionTestCase):
             username="testuser",
             password="testpass123",
             email="test@example.com",
+            employee_id="EMP001",
+            department=self.department,
+            role="EMPLOYEE",
+            rank="STAFF",
         )
 
         # 테스트용 작업 생성
@@ -36,6 +37,8 @@ class NotificationTests(APITestCase, TransactionTestCase):
             start_date="2024-03-20T00:00:00Z",
             due_date="2024-03-21T00:00:00Z",
             department=self.department,
+            status="TODO",
+            priority="MEDIUM",
         )
 
         # 테스트용 알림 생성
@@ -43,7 +46,7 @@ class NotificationTests(APITestCase, TransactionTestCase):
             recipient=self.user,
             notification_type="TASK_ASSIGNED",
             task=self.task,
-            message="You have been assigned a new task",
+            message="새로운 작업이 할당되었습니다.",
         )
 
         # API 클라이언트에 인증 추가
