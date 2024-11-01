@@ -23,6 +23,10 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from notifications.models import Notification
 from datetime import timedelta
+from django.db.models import Q
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -57,9 +61,12 @@ class TaskViewSet(viewsets.ModelViewSet):
         old_instance = self.get_object()
         old_status = old_instance.status
         old_assignee = old_instance.assignee
+        old_priority = old_instance.priority
         instance = serializer.save()
 
-        # 상태 변경 시 히스토리와 알림 생성
+        notifications = []
+
+        # 상태 변경 알림
         if old_status != instance.status:
             TaskHistoryViewSet.create_history(
                 task=instance,
@@ -68,35 +75,109 @@ class TaskViewSet(viewsets.ModelViewSet):
                 user=self.request.user,
             )
 
-            # 상태 변경 알림
-            if instance.assignee != self.request.user:
-                Notification.objects.create(
+            # 작업 완료 시 의존성 있는 작업들의 담당자에게 알림
+            if instance.status == "DONE":
+                dependent_tasks = Task.objects.filter(dependencies=instance)
+                for dep_task in dependent_tasks:
+                    notifications.append(
+                        Notification(
+                            recipient=dep_task.assignee,
+                            notification_type="TASK_DEPENDENCY_COMPLETED",
+                            task=dep_task,
+                            message=f"선행 작업이 완료되었습니다: {instance.title}",
+                            priority="HIGH",
+                        )
+                    )
+
+            # 검토 요청 시 관리자에게 알림
+            if instance.status == "REVIEW":
+                managers = User.objects.filter(
+                    department=instance.department,
+                    role__in=["MANAGER", "ADMIN"],
+                )
+                for manager in managers:
+                    notifications.append(
+                        Notification(
+                            recipient=manager,
+                            notification_type="TASK_REVIEWED",
+                            task=instance,
+                            message=f"작업 검토가 요청되었습니다: {instance.title}",
+                            priority="HIGH",
+                        )
+                    )
+
+        # 우선순위 변경 알림
+        if old_priority != instance.priority:
+            notifications.append(
+                Notification(
                     recipient=instance.assignee,
-                    notification_type="TASK_STATUS_CHANGED",
+                    notification_type="TASK_PRIORITY_CHANGED",
                     task=instance,
                     message=(
-                        f"작업 상태가 {old_status}에서 {instance.status}로"
+                        f"작업 우선순위가 {old_priority}에서"
+                        f" {instance.priority}로"
                         f" 변경되었습니다: {instance.title}"
                     ),
+                    priority=(
+                        "HIGH" if instance.priority == "URGENT" else "MEDIUM"
+                    ),
                 )
-
-        # 담당자 변경 시 알림
-        if old_assignee != instance.assignee:
-            Notification.objects.create(
-                recipient=instance.assignee,
-                notification_type="TASK_ASSIGNED",
-                task=instance,
-                message=f"작업이 재배정되었습니다: {instance.title}",
             )
 
         # 마감 임박 체크 (3일 이내)
-        if instance.due_date - timezone.now() <= timedelta(days=3):
-            Notification.objects.create(
-                recipient=instance.assignee,
-                notification_type="TASK_DUE_SOON",
+        days_until_due = (instance.due_date - timezone.now()).days
+        if 0 < days_until_due <= 3:
+            if not Notification.objects.filter(
                 task=instance,
-                message=f"작업 마감이 임박했습니다 (3일 이내): {instance.title}",
-            )
+                notification_type="TASK_DUE_SOON",
+                created_at__gte=timezone.now() - timedelta(days=1),
+            ).exists():
+                notifications.append(
+                    Notification(
+                        recipient=instance.assignee,
+                        notification_type="TASK_DUE_SOON",
+                        task=instance,
+                        message=(
+                            f"작업 마감이 {days_until_due}일 남았습니다:"
+                            f" {instance.title}"
+                        ),
+                        priority="HIGH",
+                        expires_at=instance.due_date,
+                    )
+                )
+
+        # 마감일 초과 체크
+        elif days_until_due <= 0 and instance.status not in ["DONE", "HOLD"]:
+            if not Notification.objects.filter(
+                task=instance,
+                notification_type="TASK_OVERDUE",
+                created_at__gte=timezone.now() - timedelta(days=1),
+            ).exists():
+                # 담당자와 관리자에게 알림
+                recipients = list(
+                    User.objects.filter(
+                        Q(id=instance.assignee.id)
+                        | Q(
+                            department=instance.department,
+                            role__in=["MANAGER", "ADMIN"],
+                        )
+                    ).distinct()
+                )
+
+                for recipient in recipients:
+                    notifications.append(
+                        Notification(
+                            recipient=recipient,
+                            notification_type="TASK_OVERDUE",
+                            task=instance,
+                            message=f"작업이 마감일을 초과했습니다: {instance.title}",
+                            priority="HIGH",
+                        )
+                    )
+
+        # 일괄 알림 생성
+        if notifications:
+            Notification.objects.bulk_create(notifications)
 
     def perform_create(self, serializer):
         task = serializer.save(reporter=self.request.user)
