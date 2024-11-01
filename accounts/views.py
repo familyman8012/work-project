@@ -20,10 +20,27 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        queryset = User.objects.select_related("department").filter(
+            is_active=True
+        )
+
+        # 부서 필터링 추가
+        department_id = self.request.query_params.get("department")
+        if department_id:
+            queryset = queryset.filter(department_id=department_id)
+
+        return queryset.order_by("first_name")
+
     def get_serializer_class(self):
-        if self.action in ["retrieve", "me"]:
+        if self.action in ["retrieve", "me", "list"]:
             return UserDetailSerializer
         return UserSerializer
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        print(f"User list response data: {response.data}")
+        return response
 
     @action(detail=False, methods=["get"])
     def me(self, request):

@@ -65,6 +65,9 @@ class TaskViewSet(viewsets.ModelViewSet):
                 user=self.request.user,
             )
 
+    def perform_create(self, serializer):
+        serializer.save(reporter=self.request.user)
+
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
     queryset = TaskComment.objects.all()
