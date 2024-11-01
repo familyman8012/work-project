@@ -13,7 +13,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user)
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], url_path="unread-count")
     def unread_count(self, request):
         count = self.get_queryset().filter(is_read=False).count()
         return Response({"count": count})

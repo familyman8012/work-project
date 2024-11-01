@@ -25,7 +25,7 @@ class TaskCommentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "author", "created_at", "updated_at"]
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -111,6 +111,7 @@ class TaskTimeLogSerializer(serializers.ModelSerializer):
     logged_by_name = serializers.CharField(
         source="logged_by.username", read_only=True
     )
+    duration = serializers.DurationField(read_only=True)
 
     class Meta:
         model = TaskTimeLog
@@ -123,7 +124,7 @@ class TaskTimeLogSerializer(serializers.ModelSerializer):
             "logged_by",
             "logged_by_name",
         ]
-        read_only_fields = ["id", "duration"]
+        read_only_fields = ["id", "duration", "logged_by"]
 
 
 class TaskEvaluationSerializer(serializers.ModelSerializer):
