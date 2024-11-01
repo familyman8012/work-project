@@ -97,6 +97,15 @@ class Task(models.Model):
             return timezone.now() > self.due_date
         return False
 
+    def delete(self, *args, **kwargs):
+        # 관련된 모든 데이터 삭제
+        self.comments.all().delete()
+        self.time_logs.all().delete()
+        self.history.all().delete()
+        self.attachments.all().delete()
+        self.evaluations.all().delete()
+        super().delete(*args, **kwargs)
+
 
 class TaskComment(models.Model):
     task = models.ForeignKey(

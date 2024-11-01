@@ -9,26 +9,46 @@ from django.utils import timezone
 from datetime import datetime
 from tasks.models import Task
 from tasks.serializers import TaskSerializer
+from django.db.models import Q
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+from rest_framework.pagination import PageNumberPagination
 
 # Create your views here.
 
 User = get_user_model()
 
 
+# 페이지네이션 클래스 정의
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["department", "rank"]
+    search_fields = ["first_name", "last_name", "employee_id", "email"]
 
     def get_queryset(self):
         queryset = User.objects.select_related("department").filter(
             is_active=True
         )
 
-        # 부서 필터링 추가
-        department_id = self.request.query_params.get("department")
-        if department_id:
-            queryset = queryset.filter(department_id=department_id)
+        # 검색어 처리
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(employee_id__icontains=search)
+                | Q(email__icontains=search)
+            )
 
         return queryset.order_by("first_name")
 

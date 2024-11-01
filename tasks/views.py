@@ -21,6 +21,8 @@ from .filters import TaskFilter
 from datetime import datetime
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from notifications.models import Notification
+from datetime import timedelta
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -54,9 +56,10 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         old_instance = self.get_object()
         old_status = old_instance.status
+        old_assignee = old_instance.assignee
         instance = serializer.save()
 
-        # 상태가 변경된 경우 히스토리 생성
+        # 상태 변경 시 히스토리와 알림 생성
         if old_status != instance.status:
             TaskHistoryViewSet.create_history(
                 task=instance,
@@ -65,8 +68,47 @@ class TaskViewSet(viewsets.ModelViewSet):
                 user=self.request.user,
             )
 
+            # 상태 변경 알림
+            if instance.assignee != self.request.user:
+                Notification.objects.create(
+                    recipient=instance.assignee,
+                    notification_type="TASK_STATUS_CHANGED",
+                    task=instance,
+                    message=(
+                        f"작업 상태가 {old_status}에서 {instance.status}로"
+                        f" 변경되었습니다: {instance.title}"
+                    ),
+                )
+
+        # 담당자 변경 시 알림
+        if old_assignee != instance.assignee:
+            Notification.objects.create(
+                recipient=instance.assignee,
+                notification_type="TASK_ASSIGNED",
+                task=instance,
+                message=f"작업이 재배정되었습니다: {instance.title}",
+            )
+
+        # 마감 임박 체크 (3일 이내)
+        if instance.due_date - timezone.now() <= timedelta(days=3):
+            Notification.objects.create(
+                recipient=instance.assignee,
+                notification_type="TASK_DUE_SOON",
+                task=instance,
+                message=f"작업 마감이 임박했습니다 (3일 이내): {instance.title}",
+            )
+
     def perform_create(self, serializer):
-        serializer.save(reporter=self.request.user)
+        task = serializer.save(reporter=self.request.user)
+
+        # 작업 배정 알림 생성
+        if task.assignee != self.request.user:
+            Notification.objects.create(
+                recipient=task.assignee,
+                notification_type="TASK_ASSIGNED",
+                task=task,
+                message=f"새로운 작업이 배정되었습니다: {task.title}",
+            )
 
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
@@ -81,7 +123,19 @@ class TaskCommentViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        comment = serializer.save(author=self.request.user)
+
+        # 작업 담당자에게 코멘트 알림 (작성자가 담당자가 아닌 경우)
+        if comment.task.assignee != self.request.user:
+            Notification.objects.create(
+                recipient=comment.task.assignee,
+                notification_type="TASK_COMMENT",
+                task=comment.task,
+                message=(
+                    "작업에 새로운 코멘트가 작성되었습니다:"
+                    f" {comment.task.title}"
+                ),
+            )
 
 
 class TaskAttachmentViewSet(viewsets.ModelViewSet):
