@@ -84,9 +84,35 @@ class Task(models.Model):
         verbose_name="난이도",
     )
 
+    # 마일스톤 관련 필드 추가
+    is_milestone = models.BooleanField(
+        default=False, verbose_name="마일스톤 여부"
+    )
+    milestone_description = models.TextField(
+        blank=True, null=True, verbose_name="마일스톤 설명"
+    )
+
+    # 작업 시간 관련 필드 추가
+    working_hours = models.JSONField(
+        default=dict, verbose_name="작업 시간", help_text="일별 작업 시간 기록"
+    )
+
+    # 의존성 관련 필드 추가
+    dependencies = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="dependent_tasks",
+        blank=True,
+        verbose_name="선행 작업",
+    )
+
     class Meta:
         verbose_name = "작업"
         verbose_name_plural = "작업들"
+        # 시간 충돌 체크를 위한 인덱스 추가
+        indexes = [
+            models.Index(fields=["assignee", "start_date", "due_date"]),
+        ]
 
     def __str__(self):
         return self.title

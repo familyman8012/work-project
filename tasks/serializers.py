@@ -131,12 +131,15 @@ class TaskEvaluationSerializer(serializers.ModelSerializer):
     evaluator_name = serializers.CharField(
         source="evaluator.username", read_only=True
     )
+    task = TaskSerializer(read_only=True)
+    task_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = TaskEvaluation
         fields = [
             "id",
             "task",
+            "task_id",
             "evaluator",
             "evaluator_name",
             "difficulty",
@@ -144,4 +147,49 @@ class TaskEvaluationSerializer(serializers.ModelSerializer):
             "feedback",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "evaluator", "created_at"]
+
+    def create(self, validated_data):
+        if "task" not in validated_data:
+            raise serializers.ValidationError(
+                {"task": "This field is required."}
+            )
+        return super().create(validated_data)
+
+
+class TaskCalendarSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Task
+        fields = [
+            "id",
+            "title",
+            "start_date",
+            "due_date",
+            "status",
+            "priority",
+            "is_milestone",
+            "assignee",
+            "is_delayed",
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["color"] = self.get_status_color(instance.status)
+        data["textColor"] = "#ffffff"
+        data["progress"] = self.get_progress(instance)
+        return data
+
+    def get_status_color(self, status):
+        colors = {
+            "TODO": "#9e9e9e",
+            "IN_PROGRESS": "#1976d2",
+            "REVIEW": "#ed6c02",
+            "DONE": "#2e7d32",
+            "HOLD": "#d32f2f",
+        }
+        return colors.get(status, "#9e9e9e")
+
+    def get_progress(self, task):
+        if task.estimated_hours and task.actual_hours:
+            return min((task.actual_hours / task.estimated_hours) * 100, 100)
+        return 0

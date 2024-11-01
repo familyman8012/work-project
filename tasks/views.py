@@ -16,6 +16,7 @@ from .serializers import (
     TaskHistorySerializer,
     TaskTimeLogSerializer,
     TaskEvaluationSerializer,
+    TaskCalendarSerializer,
 )
 from .filters import TaskFilter
 from datetime import datetime
@@ -25,6 +26,8 @@ from notifications.models import Notification
 from datetime import timedelta
 from django.db.models import Q
 from django.contrib.auth import get_user_model
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 User = get_user_model()
 
@@ -49,11 +52,23 @@ class TaskViewSet(viewsets.ModelViewSet):
         # 시작일, 종료일 필터링
         start_date = self.request.query_params.get("start_date_after")
         end_date = self.request.query_params.get("due_date_before")
+        is_delayed = self.request.query_params.get("is_delayed")
 
         if start_date:
             queryset = queryset.filter(start_date__gte=start_date)
         if end_date:
             queryset = queryset.filter(due_date__lte=end_date)
+
+        # 지연된 작업 필터링
+        if is_delayed == "true":
+            queryset = queryset.filter(
+                due_date__lt=timezone.now(),  # 마감일이 현재보다 이전
+                status__in=[
+                    "TODO",
+                    "IN_PROGRESS",
+                    "REVIEW",
+                ],  # 완료되지 않은 작업
+            )
 
         return queryset
 
@@ -188,8 +203,98 @@ class TaskViewSet(viewsets.ModelViewSet):
                 recipient=task.assignee,
                 notification_type="TASK_ASSIGNED",
                 task=task,
-                message=f"새로운 작업이 배정되었습니다: {task.title}",
+                message=f"새로 업이 배정되었습다: {task.title}",
             )
+
+    @action(detail=False, methods=["get"])
+    def calendar(self, request):
+        """캘린더 뷰를 위한 작업 목록 조회"""
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        assignee = request.query_params.get("assignee")
+        department = request.query_params.get("department")
+
+        queryset = self.get_queryset()
+
+        if start_date and end_date:
+            # 시간대를 포함한 datetime으로 변환
+            start_datetime = timezone.make_aware(
+                datetime.strptime(
+                    f"{start_date} 00:00:00", "%Y-%m-%d %H:%M:%S"
+                )
+            )
+            end_datetime = timezone.make_aware(
+                datetime.strptime(f"{end_date} 23:59:59", "%Y-%m-%d %H:%M:%S")
+            )
+
+            queryset = queryset.filter(
+                Q(start_date__range=[start_datetime, end_datetime])
+                | Q(due_date__range=[start_datetime, end_datetime])
+            )
+
+        # 담당자 또는 부서 기준 필터링
+        if assignee:
+            queryset = queryset.filter(assignee=assignee)
+        elif department:
+            queryset = queryset.filter(department=department)
+
+        serializer = TaskCalendarSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def update_dates(self, request, pk=None):
+        """작업 일정 업데이트 (드래그 앤 드롭)"""
+        task = self.get_object()
+        new_start = request.data.get("start_date")
+        new_end = request.data.get("due_date")
+
+        # 일정 충돌 체크
+        if self.check_schedule_conflict(
+            task.assignee, new_start, new_end, exclude_task=task
+        ):
+            return Response({"detail": "일정이 충돌합니다."}, status=400)
+
+        serializer = self.get_serializer(task, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def workload(self, request):
+        """리소스 할당 상황 조회"""
+        date = request.query_params.get("date", datetime.now().date())
+        department_id = request.query_params.get("department")
+
+        queryset = User.objects.all()
+        if department_id:
+            queryset = queryset.filter(department_id=department_id)
+
+        workload_data = []
+        for user in queryset:
+            tasks_count = Task.objects.filter(
+                assignee=user, start_date__lte=date, due_date__gte=date
+            ).count()
+            workload_data.append(
+                {
+                    "user_id": user.id,
+                    "user_name": f"{user.first_name} {user.last_name}",
+                    "tasks_count": tasks_count,
+                }
+            )
+
+        return Response(workload_data)
+
+    @action(detail=True, methods=["get"])
+    def tasks_current(self, request, pk=None):
+        """사용자의 현재 진행중인 작업 목록 조회"""
+        user = self.get_object()
+        tasks = Task.objects.filter(
+            assignee=user, status="IN_PROGRESS"
+        ).order_by("-created_at")
+
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(serializer.data)
 
 
 class TaskCommentViewSet(viewsets.ModelViewSet):
@@ -304,6 +409,30 @@ class TaskTimeLogViewSet(viewsets.ModelViewSet):
 class TaskEvaluationViewSet(viewsets.ModelViewSet):
     queryset = TaskEvaluation.objects.all()
     serializer_class = TaskEvaluationSerializer
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["task__title"]  # 작업 제목으로 검색 가능
+
+    def get_queryset(self):
+        queryset = TaskEvaluation.objects.select_related("task", "evaluator")
+
+        # 작업 ID로 필터링
+        task_id = self.request.query_params.get("task")
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+        else:
+            # task_id가 없는 경우(목록 조회) 자신의 평가만 표시
+            queryset = queryset.filter(evaluator=self.request.user)
+
+        # 난이도로 필터링
+        difficulty = self.request.query_params.get("difficulty")
+        if difficulty:
+            queryset = queryset.filter(difficulty=difficulty)
+
+        return queryset.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        serializer.save(evaluator=self.request.user)
 
 
 # DashboardViewSet, UserSearchViewSet, ReportViewSet는 추가 요구사항에 따라 구현 필요
