@@ -14,6 +14,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from organizations.models import Department
+from django.db.models import Case, When, IntegerField
 
 # Create your views here.
 
@@ -115,12 +116,23 @@ class UserViewSet(viewsets.ModelViewSet):
         print(f"Final Query: {queryset.query}")
         print(f"Result Count: {queryset.count()}")
         
-        # 본부 소속 직원이 먼저 나오도록 정렬
-        # Case문을 사용하여 본부 직원을 먼저 정렬
+        # 본부 소속 직원이 먼저 나오도록 정렬하고, 같은 팀 내에서는 직급 순으로 정렬
+        # CASE문을 사용하여 직급 순서 정의
         return queryset.order_by(
             "-department__parent_id",  # NULL(본부)이 먼저 오도록 내림차순 정렬
-            "department__name",       # 부서명으로 정렬
-            "first_name"             # 마지막으로 이름순
+            "department__name",        # 부서명으로 정렬
+            Case(                      # 직급 순서 정의
+                When(rank="DIRECTOR", then=0),
+                When(rank="GENERAL_MANAGER", then=1),
+                When(rank="DEPUTY_GENERAL_MANAGER", then=2),
+                When(rank="MANAGER", then=3),
+                When(rank="ASSISTANT_MANAGER", then=4),
+                When(rank="SENIOR", then=5),
+                When(rank="STAFF", then=6),
+                default=7,
+                output_field=IntegerField(),
+            ),
+            "first_name"              # 마지막으로 이름순
         )
 
     def get_serializer_class(self):
@@ -208,6 +220,79 @@ class UserViewSet(viewsets.ModelViewSet):
                 "tasks_by_priority": tasks_by_priority,
             }
         )
+
+    @action(detail=True, methods=["get"])
+    def tasks_statistics_detail(self, request, pk=None):
+        user = self.get_object()
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        tasks = Task.objects.filter(assignee=user)
+        if start_date:
+            tasks = tasks.filter(start_date__gte=start_date)
+        if end_date:
+            tasks = tasks.filter(due_date__lte=end_date)
+
+        # 우선순위 분포
+        priority_distribution = {
+            "URGENT": tasks.filter(priority="URGENT").count(),
+            "HIGH": tasks.filter(priority="HIGH").count(),
+            "MEDIUM": tasks.filter(priority="MEDIUM").count(),
+            "LOW": tasks.filter(priority="LOW").count(),
+        }
+
+        # 난이도 분포
+        difficulty_distribution = {
+            "VERY_HARD": tasks.filter(difficulty="VERY_HARD").count(),
+            "HARD": tasks.filter(difficulty="HARD").count(),
+            "MEDIUM": tasks.filter(difficulty="MEDIUM").count(),
+            "EASY": tasks.filter(difficulty="EASY").count(),
+        }
+
+        # 평균 작업 완료 시간 (완료된 작업만)
+        completed_tasks = tasks.filter(status="DONE", completed_at__isnull=False)
+        avg_completion_time = 0
+        if completed_tasks.exists():
+            total_hours = sum(
+                (task.completed_at - task.start_date).total_seconds() / 3600
+                for task in completed_tasks
+                if task.completed_at and task.start_date
+            )
+            avg_completion_time = total_hours / completed_tasks.count()
+
+        # 지연된 작업 비율
+        total_tasks = tasks.count()
+        delayed_tasks = len([task for task in tasks if task.is_delayed])
+        delay_rate = (delayed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+        # 월별 통계
+        monthly_stats = {}
+        for task in tasks:
+            month_key = task.start_date.strftime("%Y-%m")
+            if month_key not in monthly_stats:
+                monthly_stats[month_key] = {
+                    "total": 0,
+                    "completed": 0,
+                    "delayed": 0,
+                    "avg_completion_time": 0,
+                }
+            
+            monthly_stats[month_key]["total"] += 1
+            if task.status == "DONE":
+                monthly_stats[month_key]["completed"] += 1
+            if task.is_delayed:
+                monthly_stats[month_key]["delayed"] += 1
+
+        return Response({
+            "priority_distribution": priority_distribution,
+            "difficulty_distribution": difficulty_distribution,
+            "avg_completion_time": round(avg_completion_time, 2),  # 소수점 2자리까지
+            "delay_rate": round(delay_rate, 2),
+            "monthly_stats": monthly_stats,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks.count(),
+            "delayed_tasks": delayed_tasks,
+        })
 
 
 class UserSearchViewSet(viewsets.ViewSet):
