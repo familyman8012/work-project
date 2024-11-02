@@ -53,7 +53,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Task.objects.all().order_by("start_date")
         
-        # 검색어 처리
+        # 색어 처리
         search = self.request.query_params.get('search', '')
         if search:
             print(f"Search query: {search}")  # 디버깅용
@@ -291,7 +291,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.check_schedule_conflict(
             task.assignee, new_start, new_end, exclude_task=task
         ):
-            return Response({"detail": "일정이 충돌합니다."}, status=400)
+            return Response({"detail": "일정이 충돌합���다."}, status=400)
 
         serializer = self.get_serializer(task, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -333,6 +333,69 @@ class TaskViewSet(viewsets.ModelViewSet):
         ).order_by("-created_at")
 
         serializer = TaskSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def today_tasks(self, request):
+        """대시보드용 오늘의 작업 조회 API"""
+        user = request.user
+        today = timezone.now().date()
+        
+        # 기본 쿼리셋 (오늘이 시작일과 마감일 사이에 있는 작업)
+        queryset = Task.objects.filter(
+            start_date__date__lte=today,  # 시작일이 오늘이거나 이전
+            due_date__date__gte=today,    # 마감일이 오늘이거나 이후
+            status__in=["TODO", "IN_PROGRESS", "REVIEW"]  # 완료되지 않은 작업만
+        )
+
+        # 권한에 따른 필터링
+        if user.role != "ADMIN":
+            if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                dept = Department.objects.get(id=user.department.id)
+                if dept.parent is None:  # 본부인 경우
+                    dept_ids = [dept.id]
+                    child_dept_ids = Department.objects.filter(parent=dept).values_list('id', flat=True)
+                    dept_ids.extend(child_dept_ids)
+                    queryset = queryset.filter(department_id__in=dept_ids)
+                else:  # 팀인 경우
+                    queryset = queryset.filter(department=user.department)
+            elif user.role == "MANAGER":
+                queryset = queryset.filter(department=user.department)
+            else:
+                queryset = queryset.filter(assignee=user)
+
+        serializer = TaskSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def delayed_tasks(self, request):
+        """대시보드용 지연된 작업 조회 API"""
+        user = request.user
+        today = timezone.now().date()
+        
+        # 기본 쿼���셋 (마감일이 오늘 이전이고 아직 완료되지 않은 작업)
+        queryset = Task.objects.filter(
+            due_date__date__lt=today,  # 마감일이 오늘 이전인 작업
+            status__in=["TODO", "IN_PROGRESS", "REVIEW"]  # 완료되지 않은 작업
+        )
+
+        # 권한에 따른 필터링 (today_tasks와 동일한 로직)
+        if user.role != "ADMIN":
+            if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                dept = Department.objects.get(id=user.department.id)
+                if dept.parent is None:
+                    dept_ids = [dept.id]
+                    child_dept_ids = Department.objects.filter(parent=dept).values_list('id', flat=True)
+                    dept_ids.extend(child_dept_ids)
+                    queryset = queryset.filter(department_id__in=dept_ids)
+                else:
+                    queryset = queryset.filter(department=user.department)
+            elif user.role == "MANAGER":
+                queryset = queryset.filter(department=user.department)
+            else:
+                queryset = queryset.filter(assignee=user)
+
+        serializer = TaskSerializer(queryset, many=True)
         return Response(serializer.data)
 
 
@@ -455,7 +518,7 @@ class TaskEvaluationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = TaskEvaluation.objects.select_related("task", "evaluator")
 
-        # 작업 ID로 필터링
+        # 작업 ID로 필터���
         task_id = self.request.query_params.get("task")
         if task_id:
             queryset = queryset.filter(task_id=task_id)
