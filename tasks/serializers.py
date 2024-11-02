@@ -39,6 +39,9 @@ class TaskSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(
         source="department.name", read_only=True
     )
+    department_parent_id = serializers.IntegerField(
+        source="department.parent_id", read_only=True
+    )
     comments = TaskCommentSerializer(many=True, read_only=True)
     is_delayed = serializers.BooleanField(read_only=True)
 
@@ -57,6 +60,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "reporter_name",
             "department",
             "department_name",
+            "department_parent_id",
             "start_date",
             "due_date",
             "completed_at",
