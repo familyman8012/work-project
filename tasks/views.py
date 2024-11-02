@@ -31,37 +31,83 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Value, CharField
 from django.db.models.functions import Concat
+import math
 
 User = get_user_model()
 
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
-    page_size_query_param = "page_size"
+    page_size_query_param = 'page_size'
     max_page_size = 100
+
+    def get_paginated_response(self, data):
+        # 전체 쿼리셋의 수를 사용
+        count = self.page.paginator.count
+        return Response({
+            'count': count,
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'total_pages': math.ceil(count / self.page_size),
+            'current_page': self.page.number,
+            'results': data
+        })
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all().order_by("start_date")
+    queryset = Task.objects.all()
     serializer_class = TaskSerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ["status", "priority", "department", "assignee"]
+    filterset_fields = ["status", "priority", "assignee"]
     ordering_fields = ["start_date", "due_date", "created_at", "priority"]
     ordering = ["start_date"]
 
     def get_queryset(self):
-        queryset = Task.objects.all().order_by("start_date")
+        queryset = Task.objects.select_related('department', 'assignee').all()
         
-        # 색어 처리
+        # 부서 필터링 로직
+        department_id = self.request.query_params.get('department')
+        if department_id:
+            try:
+                department_id = int(department_id)
+                selected_dept = Department.objects.get(id=department_id)
+                
+                print(f"\n=== Department Filter Debug ===")
+                print(f"Selected Department ID: {department_id}")
+                print(f"Selected Department: {selected_dept.name}")
+                print(f"Is HQ? {selected_dept.parent is None}")
+                
+                if selected_dept.parent is None:  # 본부인 경우
+                    child_depts = Department.objects.filter(parent=department_id)
+                    dept_ids = [department_id] + list(child_depts.values_list('id', flat=True))
+                    
+                    print(f"Child Departments: {[d.name for d in child_depts]}")
+                    print(f"All Department IDs: {dept_ids}")
+                    
+                    # 각 부서별 작업 수 먼저 확인
+                    for dept_id in dept_ids:
+                        dept_tasks = Task.objects.filter(department_id=dept_id)
+                        print(f"Tasks in dept {dept_id}: {dept_tasks.count()}")
+                    
+                    queryset = queryset.filter(department_id__in=dept_ids)
+                else:
+                    queryset = queryset.filter(department_id=department_id)
+                
+                # 최종 쿼리셋 결과 확인
+                print(f"Final queryset count: {queryset.count()}")
+                print(f"SQL Query: {queryset.query}")
+                print("=== End Debug ===\n")
+                
+            except (Department.DoesNotExist, ValueError) as e:
+                print(f"Error: {e}")
+                return Task.objects.none()
+
+        # 검색어 처리
         search = self.request.query_params.get('search', '')
         if search:
-            print(f"Search query: {search}")  # 디버깅용
-            
-            # 작업 제목과 설명 검색
             title_desc_search = Q(title__icontains=search) | Q(description__icontains=search)
             
-            # 담당자 이름 검색을 위한 annotate 추가
             queryset = queryset.annotate(
                 full_name=Concat(
                     'assignee__last_name',
@@ -70,29 +116,18 @@ class TaskViewSet(viewsets.ModelViewSet):
                 )
             )
             
-            # 담당자 이름 검색 조건
             name_search = Q(full_name__icontains=search)
-            
-            # 모든 검색 조건 결합
             queryset = queryset.filter(title_desc_search | name_search)
-            print(f"Filtered queryset count: {queryset.count()}")  # 디버깅용
 
-        # 부서 필터링 로직
-        department_id = self.request.query_params.get('department')
-        if department_id:
-            try:
-                selected_dept = Department.objects.get(id=department_id)
-                if selected_dept.parent is None:
-                    dept_ids = [selected_dept.id]
-                    child_dept_ids = Department.objects.filter(parent=selected_dept).values_list('id', flat=True)
-                    dept_ids.extend(child_dept_ids)
-                    queryset = queryset.filter(department_id__in=dept_ids)
-                else:
-                    queryset = queryset.filter(department_id=department_id)
-            except Department.DoesNotExist:
-                return Task.objects.none()
+        # 나머지 필터링 로직
+        status = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
 
-        # 날짜 필터링
+        priority = self.request.query_params.get('priority')
+        if priority:
+            queryset = queryset.filter(priority=priority)
+
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
 
@@ -101,15 +136,40 @@ class TaskViewSet(viewsets.ModelViewSet):
         if end_date:
             queryset = queryset.filter(due_date__lte=end_date)
 
-        # 지연된 작업 필터링
-        is_delayed = self.request.query_params.get("is_delayed")
-        if is_delayed == "true":
-            queryset = queryset.filter(
-                due_date__lt=timezone.now(),
-                status__in=["TODO", "IN_PROGRESS", "REVIEW"],
-            )
+        return queryset.distinct().order_by('start_date')
 
-        return queryset.distinct()
+    def list(self, request, *args, **kwargs):
+        # 1. 전체 쿼리셋 가져오기
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # 2. 페이지네이션 적용 전의 전체 결과 저장
+        total_results = queryset.count()
+        
+        # 3. 페이지네이션 적용
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            # 4. 페이지네이션된 응답에 전체 결과 수 포함
+            return Response({
+                'count': total_results,  # 전체 결과 수 (21)
+                'next': self.paginator.get_next_link(),
+                'previous': self.paginator.get_previous_link(),
+                'total_pages': math.ceil(total_results / self.paginator.page_size),
+                'current_page': self.paginator.page.number,
+                'results': serializer.data
+            })
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def paginate_queryset(self, queryset):
+        # 페이지네이션 결과 로깅
+        page = super().paginate_queryset(queryset)
+        if page is not None:
+            print(f"Page size: {len(page)}")
+            print(f"Total pages: {self.paginator.page.paginator.num_pages}")
+        return page
 
     def perform_update(self, serializer):
         old_instance = self.get_object()
@@ -291,7 +351,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.check_schedule_conflict(
             task.assignee, new_start, new_end, exclude_task=task
         ):
-            return Response({"detail": "일정이 충돌합���다."}, status=400)
+            return Response({"detail": "일정이 충돌합다."}, status=400)
 
         serializer = self.get_serializer(task, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -373,7 +433,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         user = request.user
         today = timezone.now().date()
         
-        # 기본 쿼���셋 (마감일이 오늘 이전이고 아직 완료되지 않은 작업)
+        # 기본 쿼셋 (마감일이 오늘 이전이고 아직 완료되지 않은 작업)
         queryset = Task.objects.filter(
             due_date__date__lt=today,  # 마감일이 오늘 이전인 작업
             status__in=["TODO", "IN_PROGRESS", "REVIEW"]  # 완료되지 않은 작업
@@ -518,7 +578,7 @@ class TaskEvaluationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = TaskEvaluation.objects.select_related("task", "evaluator")
 
-        # 작업 ID로 필터���
+        # 작업 ID로 필터
         task_id = self.request.query_params.get("task")
         if task_id:
             queryset = queryset.filter(task_id=task_id)
