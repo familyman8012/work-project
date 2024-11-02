@@ -9,6 +9,7 @@ from .models import (
     TaskTimeLog,
     TaskEvaluation,
 )
+from organizations.models import Department
 from .serializers import (
     TaskSerializer,
     TaskCommentSerializer,
@@ -42,24 +43,66 @@ class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all().order_by("-created_at")
     serializer_class = TaskSerializer
     pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["title", "description"]
     filterset_fields = ["status", "priority", "department", "assignee"]
+    ordering_fields = ["start_date", "due_date", "created_at", "priority"]
+    ordering = ["start_date"]
 
     def get_queryset(self):
         queryset = Task.objects.all().order_by("-created_at")
 
         # 시작일, 종료일 필터링
-        start_date = self.request.query_params.get("start_date_after")
-        end_date = self.request.query_params.get("due_date_before")
+        start_date_before = self.request.query_params.get("start_date_before")
+        due_date_after = self.request.query_params.get("due_date_after")
         is_delayed = self.request.query_params.get("is_delayed")
+        department = self.request.query_params.get("department")
 
-        if start_date:
-            queryset = queryset.filter(start_date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(due_date__lte=end_date)
+        if start_date_before and due_date_after:
+            # 작업 기간이 주어진 날짜와 겹치는지 확인
+            queryset = queryset.filter(
+                Q(start_date__lte=start_date_before) &  # 시작일이 지정된 날짜보다 이전
+                Q(due_date__gte=due_date_after)         # 종료일이 지정된 날짜보다 이후
+            )
 
-        # 지연된 작업 필터링
+        # 사용자 권한에 따른 필터링 (먼저 적용)
+        user = self.request.user
+        if not user.is_authenticated:
+            return Task.objects.none()
+
+        # 관리자는 모든 작업 조회 가능
+        if user.role != "ADMIN":
+            # 부서 기준 필터링
+            if department:
+                if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                    # 이사/본부장은 지정된 부서와 그 하위 부서의 작업 모두 조회
+                    dept = Department.objects.get(id=department)
+                    dept_and_children = Department.objects.filter(
+                        Q(id=dept.id) | Q(parent=dept)
+                    )
+                    queryset = queryset.filter(department__in=dept_and_children)
+                elif user.role == "MANAGER":
+                    # 팀장은 자신의 팀 작업만 조회
+                    queryset = queryset.filter(department=department)
+                else:
+                    # 일반 직원은 자신의 작업만 조회
+                    queryset = queryset.filter(department=department, assignee=user)
+            else:
+                # 부서 파라미터가 없는 경우의 기본 필터링
+                if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                    # 이사/본부장은 자신의 부서와 하위 부서의 작업 모두 조회
+                    dept_and_children = Department.objects.filter(
+                        Q(id=user.department.id) | Q(parent=user.department)
+                    )
+                    queryset = queryset.filter(department__in=dept_and_children)
+                elif user.role == "MANAGER":
+                    # 팀장은 자신의 팀 작업만 조회
+                    queryset = queryset.filter(department=user.department)
+                else:
+                    # 일반 직원은 자신의 작업만 조회
+                    queryset = queryset.filter(assignee=user)
+
+        # 지연된 작업 필터링 (권한 필터링 후 적용)
         if is_delayed == "true":
             queryset = queryset.filter(
                 due_date__lt=timezone.now(),  # 마감일이 현재보다 이전

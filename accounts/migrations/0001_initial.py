@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
                 ('employee_id', models.CharField(help_text='사원 번호', max_length=10, unique=True)),
                 ('role', models.CharField(choices=[('EMPLOYEE', '일반 직원'), ('MANAGER', '관리자'), ('ADMIN', '최고 관리자')], default='EMPLOYEE', max_length=20)),
-                ('rank', models.CharField(choices=[('STAFF', '사원'), ('SENIOR', '주임'), ('ASSISTANT_MANAGER', '대리'), ('MANAGER', '과장'), ('DEPUTY_GENERAL_MANAGER', '차장'), ('GENERAL_MANAGER', '부장'), ('DIRECTOR', '이사')], default='STAFF', max_length=30)),
+                ('rank', models.CharField(choices=[('STAFF', '사원'), ('SENIOR', '주임'), ('ASSISTANT_MANAGER', '대리'), ('MANAGER', '과장'), ('DEPUTY_GENERAL_MANAGER', '차장'), ('GENERAL_MANAGER', '본부장'), ('DIRECTOR', '이사')], default='STAFF', max_length=30)),
                 ('department', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='employees', to='organizations.department')),
                 ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
                 ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
