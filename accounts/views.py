@@ -13,6 +13,7 @@ from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
+from organizations.models import Department
 
 # Create your views here.
 
@@ -25,20 +26,77 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = "page_size"
     max_page_size = 100
 
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.page.paginator.count,  # 전체 결과 수
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'results': data
+        })
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ["department", "rank"]
+    filter_backends = [filters.SearchFilter]
     search_fields = ["first_name", "last_name", "employee_id", "email"]
 
     def get_queryset(self):
-        queryset = User.objects.select_related("department").filter(
-            is_active=True
-        )
+        user = self.request.user
+        queryset = User.objects.select_related("department").filter(is_active=True)
+        department_id = self.request.query_params.get('department')
+        rank = self.request.query_params.get('rank')
+
+        # 일반 직원은 접근 불가
+        if user.role == "EMPLOYEE":
+            return User.objects.none()
+
+        # 부서 필터링 공통 함수
+        def get_department_users(dept_id):
+            """부서 ID를 받아서 해당 부서와 산하 팀의 모든 직원 ID 목록을 반환"""
+            try:
+                dept = Department.objects.get(id=dept_id)
+                print(f"\n=== Department Filter Debug ===")
+                print(f"Selected Department: {dept.name}")
+                print(f"Parent ID: {dept.parent_id}")
+                
+                if dept.parent is None:  # 본부인 경우
+                    # 본부와 산하 팀의 모든 직원
+                    child_depts = Department.objects.filter(parent=dept.id)
+                    dept_ids = [dept.id] + list(child_depts.values_list('id', flat=True))
+                    print(f"Child Departments: {[d.name for d in child_depts]}")
+                    print(f"Department IDs: {dept_ids}")
+                    return dept_ids
+                else:  # 팀인 경우
+                    return [dept.id]
+            except Department.DoesNotExist:
+                return []
+
+        # 사용자 권한별 처리
+        if user.role == "ADMIN":
+            if department_id:
+                dept_ids = get_department_users(department_id)
+                if dept_ids:
+                    print(f"Admin - Filtering by departments: {dept_ids}")
+                    queryset = queryset.filter(department_id__in=dept_ids)
+
+        elif user.rank in ["GENERAL_MANAGER", "DIRECTOR"]:
+            if user.department.parent is None:  # 본부장/이사가 본부 소속인 경우
+                if department_id:
+                    dept_ids = get_department_users(department_id)
+                    if dept_ids:
+                        print(f"Director/GM - Filtering by departments: {dept_ids}")
+                        queryset = queryset.filter(department_id__in=dept_ids)
+                else:
+                    # 자신의 본부 전체 직원
+                    dept_ids = get_department_users(user.department.id)
+                    print(f"Director/GM - Default departments: {dept_ids}")
+                    queryset = queryset.filter(department_id__in=dept_ids)
+
+        elif user.role == "MANAGER":
+            queryset = queryset.filter(department=user.department)
 
         # 검색어 처리
         search = self.request.query_params.get("search")
@@ -50,7 +108,20 @@ class UserViewSet(viewsets.ModelViewSet):
                 | Q(email__icontains=search)
             )
 
-        return queryset.order_by("first_name")
+        # rank 필터링 추가
+        if rank:
+            queryset = queryset.filter(rank=rank)
+
+        print(f"Final Query: {queryset.query}")
+        print(f"Result Count: {queryset.count()}")
+        
+        # 본부 소속 직원이 먼저 나오도록 정렬
+        # Case문을 사용하여 본부 직원을 먼저 정렬
+        return queryset.order_by(
+            "-department__parent_id",  # NULL(본부)이 먼저 오도록 내림차순 정렬
+            "department__name",       # 부서명으로 정렬
+            "first_name"             # 마지막으로 이름순
+        )
 
     def get_serializer_class(self):
         if self.action in ["retrieve", "me", "list"]:
@@ -58,9 +129,16 @@ class UserViewSet(viewsets.ModelViewSet):
         return UserSerializer
 
     def list(self, request, *args, **kwargs):
-        response = super().list(request, *args, **kwargs)
-        print(f"User list response data: {response.data}")
-        return response
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # 페이지네이션 적용
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
     def me(self, request):

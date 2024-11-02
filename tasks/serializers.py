@@ -70,6 +70,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "estimated_hours",
             "actual_hours",
             "is_delayed",
+            "difficulty",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
