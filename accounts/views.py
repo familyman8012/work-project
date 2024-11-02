@@ -283,15 +283,30 @@ class UserViewSet(viewsets.ModelViewSet):
             if task.is_delayed:
                 monthly_stats[month_key]["delayed"] += 1
 
+        # 평균 점수 계산 (평가가 있는 완료된 작업만)
+        completed_tasks_with_eval = tasks.filter(
+            status="DONE",
+            evaluations__isnull=False
+        )
+        avg_score = 0
+        if completed_tasks_with_eval.exists():
+            total_score = sum(
+                task.evaluations.first().performance_score
+                for task in completed_tasks_with_eval
+                if task.evaluations.exists()
+            )
+            avg_score = total_score / completed_tasks_with_eval.count()
+
         return Response({
             "priority_distribution": priority_distribution,
             "difficulty_distribution": difficulty_distribution,
-            "avg_completion_time": round(avg_completion_time, 2),  # 소수점 2자리까지
+            "avg_completion_time": round(avg_completion_time, 2),
             "delay_rate": round(delay_rate, 2),
             "monthly_stats": monthly_stats,
             "total_tasks": total_tasks,
             "completed_tasks": completed_tasks.count(),
             "delayed_tasks": delayed_tasks,
+            "avg_score": round(avg_score, 2),
         })
 
 
