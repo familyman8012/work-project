@@ -32,6 +32,7 @@ class TaskSerializer(serializers.ModelSerializer):
     assignee_name = serializers.CharField(
         source="assignee.username", read_only=True
     )
+    assignee_full_name = serializers.SerializerMethodField()
     reporter_name = serializers.CharField(
         source="reporter.username", read_only=True
     )
@@ -51,6 +52,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "priority",
             "assignee",
             "assignee_name",
+            "assignee_full_name",
             "reporter",
             "reporter_name",
             "department",
@@ -66,6 +68,11 @@ class TaskSerializer(serializers.ModelSerializer):
             "is_delayed",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_assignee_full_name(self, obj):
+        if obj.assignee:
+            return f"{obj.assignee.last_name}{obj.assignee.first_name}"
+        return ""
 
 
 class TaskAttachmentSerializer(serializers.ModelSerializer):

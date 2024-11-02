@@ -5,6 +5,8 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source='department.name', read_only=True)
+
     class Meta:
         model = User
         fields = [
@@ -15,6 +17,9 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "rank",
             "department",
+            "department_name",
+            "first_name",
+            "last_name",
         ]
         read_only_fields = ["id"]
 

@@ -29,6 +29,8 @@ from django.db.models import Q
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Value, CharField
+from django.db.models.functions import Concat
 
 User = get_user_model()
 
@@ -40,80 +42,74 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all().order_by("-created_at")
+    queryset = Task.objects.all().order_by("start_date")
     serializer_class = TaskSerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["title", "description"]
     filterset_fields = ["status", "priority", "department", "assignee"]
     ordering_fields = ["start_date", "due_date", "created_at", "priority"]
     ordering = ["start_date"]
 
     def get_queryset(self):
-        queryset = Task.objects.all().order_by("-created_at")
-
-        # 시작일, 종료일 필터링
-        start_date_before = self.request.query_params.get("start_date_before")
-        due_date_after = self.request.query_params.get("due_date_after")
-        is_delayed = self.request.query_params.get("is_delayed")
-        department = self.request.query_params.get("department")
-
-        if start_date_before and due_date_after:
-            # 작업 기간이 주어진 날짜와 겹치는지 확인
-            queryset = queryset.filter(
-                Q(start_date__lte=start_date_before) &  # 시작일이 지정된 날짜보다 이전
-                Q(due_date__gte=due_date_after)         # 종료일이 지정된 날짜보다 이후
+        queryset = Task.objects.all().order_by("start_date")
+        
+        # 검색어 처리
+        search = self.request.query_params.get('search', '')
+        if search:
+            print(f"Search query: {search}")  # 디버깅용
+            
+            # 작업 제목과 설명 검색
+            title_desc_search = Q(title__icontains=search) | Q(description__icontains=search)
+            
+            # 담당자 이름 검색을 위한 annotate 추가
+            queryset = queryset.annotate(
+                full_name=Concat(
+                    'assignee__last_name',
+                    'assignee__first_name',
+                    output_field=CharField()
+                )
             )
+            
+            # 담당자 이름 검색 조건
+            name_search = Q(full_name__icontains=search)
+            
+            # 모든 검색 조건 결합
+            queryset = queryset.filter(title_desc_search | name_search)
+            print(f"Filtered queryset count: {queryset.count()}")  # 디버깅용
 
-        # 사용자 권한에 따른 필터링 (먼저 적용)
-        user = self.request.user
-        if not user.is_authenticated:
-            return Task.objects.none()
-
-        # 관리자는 모든 작업 조회 가능
-        if user.role != "ADMIN":
-            # 부서 기준 필터링
-            if department:
-                if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
-                    # 이사/본부장은 지정된 부서와 그 하위 부서의 작업 모두 조회
-                    dept = Department.objects.get(id=department)
-                    dept_and_children = Department.objects.filter(
-                        Q(id=dept.id) | Q(parent=dept)
-                    )
-                    queryset = queryset.filter(department__in=dept_and_children)
-                elif user.role == "MANAGER":
-                    # 팀장은 자신의 팀 작업만 조회
-                    queryset = queryset.filter(department=department)
+        # 부서 필터링 로직
+        department_id = self.request.query_params.get('department')
+        if department_id:
+            try:
+                selected_dept = Department.objects.get(id=department_id)
+                if selected_dept.parent is None:
+                    dept_ids = [selected_dept.id]
+                    child_dept_ids = Department.objects.filter(parent=selected_dept).values_list('id', flat=True)
+                    dept_ids.extend(child_dept_ids)
+                    queryset = queryset.filter(department_id__in=dept_ids)
                 else:
-                    # 일반 직원은 자신의 작업만 조회
-                    queryset = queryset.filter(department=department, assignee=user)
-            else:
-                # 부서 파라미터가 없는 경우의 기본 필터링
-                if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
-                    # 이사/본부장은 자신의 부서와 하위 부서의 작업 모두 조회
-                    dept_and_children = Department.objects.filter(
-                        Q(id=user.department.id) | Q(parent=user.department)
-                    )
-                    queryset = queryset.filter(department__in=dept_and_children)
-                elif user.role == "MANAGER":
-                    # 팀장은 자신의 팀 작업만 조회
-                    queryset = queryset.filter(department=user.department)
-                else:
-                    # 일반 직원은 자신의 작업만 조회
-                    queryset = queryset.filter(assignee=user)
+                    queryset = queryset.filter(department_id=department_id)
+            except Department.DoesNotExist:
+                return Task.objects.none()
 
-        # 지연된 작업 필터링 (권한 필터링 후 적용)
+        # 날짜 필터링
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        if start_date:
+            queryset = queryset.filter(start_date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(due_date__lte=end_date)
+
+        # 지연된 작업 필터링
+        is_delayed = self.request.query_params.get("is_delayed")
         if is_delayed == "true":
             queryset = queryset.filter(
-                due_date__lt=timezone.now(),  # 마감일이 현재보다 이전
-                status__in=[
-                    "TODO",
-                    "IN_PROGRESS",
-                    "REVIEW",
-                ],  # 완료되지 않은 작업
+                due_date__lt=timezone.now(),
+                status__in=["TODO", "IN_PROGRESS", "REVIEW"],
             )
 
-        return queryset
+        return queryset.distinct()
 
     def perform_update(self, serializer):
         old_instance = self.get_object()
@@ -147,7 +143,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                         )
                     )
 
-            # 검토 요청 시 관리자에게 알림
+            # 검토 요청 시 리자에게 알림
             if instance.status == "REVIEW":
                 managers = User.objects.filter(
                     department=instance.department,
