@@ -95,7 +95,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 else:
                     queryset = queryset.filter(department_id=department_id)
                 
-                # 최종 쿼리셋 결과 확인
+                # 최종 리셋 결과 확인
                 print(f"Final queryset count: {queryset.count()}")
                 print(f"SQL Query: {queryset.query}")
                 print("=== End Debug ===\n")
@@ -461,7 +461,7 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='workload-stats')
     def workload_stats(self, request):
-        """작업 부하 통계"""
+        """작 부하 통계"""
         today = timezone.now().date()
         start_date = today - timedelta(days=7)
         
@@ -595,15 +595,16 @@ class TaskViewSet(viewsets.ModelViewSet):
         # 각 팀원별 성과 계산
         performance_data = []
         for member in team_members:
+            # 전체 작업 수와 완료된 작업 수 계산
             member_tasks = Task.objects.filter(assignee=member)
             total_tasks = member_tasks.count()
             completed_tasks = member_tasks.filter(status="DONE").count()
             completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
             
-            avg_score = TaskEvaluation.objects.filter(
-                task__in=member_tasks,
-                task__status="DONE"
-            ).aggregate(Avg('performance_score'))['performance_score__avg'] or 0
+            # 평가 점수 계산 - 완료된 작업만 대상으로
+            completed_task_ids = member_tasks.filter(status="DONE").values_list('id', flat=True)
+            evaluations = TaskEvaluation.objects.filter(task_id__in=completed_task_ids)
+            avg_score = evaluations.aggregate(Avg('performance_score'))['performance_score__avg'] or 0
 
             performance_data.append({
                 'user_id': member.id,
