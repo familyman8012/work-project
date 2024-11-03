@@ -222,11 +222,12 @@ class ReportViewSet(viewsets.ViewSet):
         # 비율 계산 및 필드명 매핑
         result = []
         for item in distribution:
-            count = item[field]
-            percentage = (item['count'] / total * 100) if total > 0 else 0
+            field_value = item[field]
+            count = item['count']
+            percentage = (count / total * 100) if total > 0 else 0
             result.append({
-                "field": item[field],  # 원래 필드값 그대로 사용
-                "count": item['count'],
+                "field": field_value,
+                "count": count,
                 "percentage": round(percentage, 1)
             })
         
