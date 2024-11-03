@@ -32,6 +32,7 @@ from rest_framework.response import Response
 from django.db.models import Value, CharField
 from django.db.models.functions import Concat
 import math
+from django.db.models import Avg
 
 User = get_user_model()
 
@@ -203,7 +204,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                         )
                     )
 
-            # 검토 요청 시 리자에게 알림
+            # 검토  리자에게 알림
             if instance.status == "REVIEW":
                 managers = User.objects.filter(
                     department=instance.department,
@@ -284,7 +285,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                             recipient=recipient,
                             notification_type="TASK_OVERDUE",
                             task=instance,
-                            message=f"작업이 마감일을 초과했습니다: {instance.title}",
+                            message=f"작업이 마감일을 초과습다: {instance.title}",
                             priority="HIGH",
                         )
                     )
@@ -403,7 +404,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         # 기본 쿼리셋 (오늘이 시작일과 마감일 사이에 있는 작업)
         queryset = Task.objects.filter(
-            start_date__date__lte=today,  # 시작일이 오늘이거나 이전
+            start_date__date__lte=today,  # 시작일이 오늘이 나 이전
             due_date__date__gte=today,    # 마감일이 오늘이거나 이후
             status__in=["TODO", "IN_PROGRESS", "REVIEW"]  # 완료되지 않은 작업만
         )
@@ -433,7 +434,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         user = request.user
         today = timezone.now().date()
         
-        # 기본 쿼셋 (마감일이 오늘 이전이고 아직 완료되지 않은 작업)
+        # 기본 쿼셋 (마감일이 오늘 이전이고 직 완료되지 않은 작업)
         queryset = Task.objects.filter(
             due_date__date__lt=today,  # 마감일이 오늘 이전인 작업
             status__in=["TODO", "IN_PROGRESS", "REVIEW"]  # 완료되지 않은 작업
@@ -457,6 +458,274 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         serializer = TaskSerializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='workload-stats')
+    def workload_stats(self, request):
+        """작업 부하 통계"""
+        today = timezone.now().date()
+        start_date = today - timedelta(days=7)
+        
+        # 권한에 따른 쿼리셋 필터링
+        if request.user.role == "ADMIN":
+            queryset = Task.objects.all()
+        elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if request.user.department.parent is None:  # 본부장인 경우
+                dept_ids = [request.user.department.id]
+                child_dept_ids = Department.objects.filter(parent=request.user.department).values_list('id', flat=True)
+                dept_ids.extend(child_dept_ids)
+                queryset = Task.objects.filter(department_id__in=dept_ids)
+            else:  # 팀장인 경우
+                queryset = Task.objects.filter(department=request.user.department)
+        else:
+            queryset = Task.objects.filter(assignee=request.user)
+        
+        # 일별 통계 계산
+        daily_stats = []
+        for i in range(7):
+            date = start_date + timedelta(days=i)
+            stats = {
+                'date': date.strftime('%Y-%m-%d'),
+                'total': queryset.filter(start_date__date=date).count(),
+                'completed': queryset.filter(
+                    completed_at__date=date, 
+                    status='DONE'
+                ).count(),
+                'inProgress': queryset.filter(
+                    start_date__date=date, 
+                    status='IN_PROGRESS'
+                ).count(),
+                'delayed': queryset.filter(
+                    due_date__date=date,
+                    status__in=['TODO', 'IN_PROGRESS']
+                ).count()
+            }
+            daily_stats.append(stats)
+        
+        return Response(daily_stats)
+
+    @action(detail=False, methods=['get'], url_path='priority-stats')
+    def priority_stats(self, request):
+        """우선순위별 작업 통계"""
+        # 권한에 따른 쿼리셋 필터링
+        if request.user.role == "ADMIN":
+            queryset = Task.objects.all()
+        elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if request.user.department.parent is None:
+                dept_ids = [request.user.department.id]
+                child_dept_ids = Department.objects.filter(parent=request.user.department).values_list('id', flat=True)
+                dept_ids.extend(child_dept_ids)
+                queryset = Task.objects.filter(department_id__in=dept_ids)
+            else:
+                queryset = Task.objects.filter(department=request.user.department)
+        else:
+            queryset = Task.objects.filter(assignee=request.user)
+
+        stats = []
+        total = queryset.count()
+        for priority, _ in Task.PRIORITY_CHOICES:
+            count = queryset.filter(priority=priority).count()
+            percentage = (count / total * 100) if total > 0 else 0
+            stats.append({
+                'priority': priority,
+                'count': count,
+                'percentage': round(percentage, 1)
+            })
+        return Response(stats)
+
+    @action(detail=False, methods=['get'], url_path='upcoming-deadlines')
+    def upcoming_deadlines(self, request):
+        """다가오는 마감일 작업"""
+        today = timezone.now().date()
+        end_date = today + timedelta(days=7)  # 일주일 이내 마감
+
+        # 권한에 따른 쿼리셋 필터링
+        if request.user.role == "ADMIN":
+            queryset = Task.objects.all()
+        elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if request.user.department.parent is None:
+                dept_ids = [request.user.department.id]
+                child_dept_ids = Department.objects.filter(parent=request.user.department).values_list('id', flat=True)
+                dept_ids.extend(child_dept_ids)
+                queryset = Task.objects.filter(department_id__in=dept_ids)
+            else:
+                queryset = Task.objects.filter(department=request.user.department)
+        else:
+            queryset = Task.objects.filter(assignee=request.user)
+
+        upcoming_tasks = queryset.filter(
+            due_date__date__range=[today, end_date],
+            status__in=['TODO', 'IN_PROGRESS']
+        ).order_by('due_date')[:5]  # 상위 5개만
+
+        serializer = TaskSerializer(upcoming_tasks, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='team-performance')
+    def team_performance(self, request):
+        """팀 성과 통계"""
+        # 권한에 따른 팀원 목록 조회
+        if request.user.role == "ADMIN":
+            team_members = User.objects.filter(
+                is_active=True,
+                rank__in=["STAFF", "SENIOR", "ASSISTANT_MANAGER", "MANAGER", "DEPUTY_GENERAL_MANAGER"]  # 본부장/이사 제외
+            )
+        elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if request.user.department.parent is None:
+                dept_ids = [request.user.department.id]
+                child_dept_ids = Department.objects.filter(parent=request.user.department).values_list('id', flat=True)
+                dept_ids.extend(child_dept_ids)
+                team_members = User.objects.filter(
+                    department_id__in=dept_ids, 
+                    is_active=True,
+                    rank__in=["STAFF", "SENIOR", "ASSISTANT_MANAGER", "MANAGER", "DEPUTY_GENERAL_MANAGER"]  # 본부장/이사 제외
+                )
+            else:
+                team_members = User.objects.filter(
+                    department=request.user.department, 
+                    is_active=True,
+                    rank__in=["STAFF", "SENIOR", "ASSISTANT_MANAGER", "MANAGER", "DEPUTY_GENERAL_MANAGER"]  # 본부장/이사 제외
+                )
+        else:
+            team_members = User.objects.filter(
+                department=request.user.department, 
+                is_active=True,
+                rank__in=["STAFF", "SENIOR", "ASSISTANT_MANAGER", "MANAGER", "DEPUTY_GENERAL_MANAGER"]  # 본부장/이사 제외
+            )
+
+        # 각 팀원별 성과 계산
+        performance_data = []
+        for member in team_members:
+            member_tasks = Task.objects.filter(assignee=member)
+            total_tasks = member_tasks.count()
+            completed_tasks = member_tasks.filter(status="DONE").count()
+            completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+            
+            avg_score = TaskEvaluation.objects.filter(
+                task__in=member_tasks,
+                task__status="DONE"
+            ).aggregate(Avg('performance_score'))['performance_score__avg'] or 0
+
+            performance_data.append({
+                'user_id': member.id,
+                'name': f"{member.last_name}{member.first_name}",
+                'completion_rate': round(completion_rate, 1),
+                'task_count': total_tasks,
+                'average_score': round(avg_score, 1)
+            })
+
+        return Response({
+            'members': performance_data
+        })
+
+    @action(detail=False, methods=['get'], url_path='recent')
+    def recent_activities(self, request):
+        """최근 작업 활동 내역"""
+        # 권한에 따른 쿼리셋 필터링
+        if request.user.role == "ADMIN":
+            queryset = TaskHistory.objects.all()
+        elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if request.user.department.parent is None:
+                dept_ids = [request.user.department.id]
+                child_dept_ids = Department.objects.filter(parent=request.user.department).values_list('id', flat=True)
+                dept_ids.extend(child_dept_ids)
+                queryset = TaskHistory.objects.filter(task__department_id__in=dept_ids)
+            else:
+                queryset = TaskHistory.objects.filter(task__department=request.user.department)
+        else:
+            queryset = TaskHistory.objects.filter(
+                Q(task__assignee=request.user) | Q(changed_by=request.user)
+            )
+
+        recent_activities = queryset.select_related(
+            'task', 'changed_by'
+        ).order_by('-created_at')[:10]
+
+        def get_status_text(status: str) -> str:
+            status_map = {
+                "TODO": "예정",
+                "IN_PROGRESS": "진행중",
+                "REVIEW": "검토중",
+                "DONE": "완료",
+                "HOLD": "보류"
+            }
+            return status_map.get(status, status)
+
+        activities_data = []
+        for activity in recent_activities:
+            activities_data.append({
+                'id': activity.id,
+                'type': 'STATUS_CHANGED',
+                'description': f'작업 상태가 {get_status_text(activity.previous_status)}에서 {get_status_text(activity.new_status)}로 변경되었습니다.',
+                'created_at': activity.created_at,
+                'task_id': activity.task.id,
+                'task_title': activity.task.title
+            })
+
+        return Response(activities_data)
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """작업 전반적인 통계"""
+        today = timezone.now().date()
+        last_week = today - timedelta(days=7)
+        
+        # 권한에 따른 쿼리셋 필터링
+        if request.user.role == "ADMIN":
+            queryset = Task.objects.all()
+        elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if request.user.department.parent is None:
+                dept_ids = [request.user.department.id]
+                child_dept_ids = Department.objects.filter(parent=request.user.department).values_list('id', flat=True)
+                dept_ids.extend(child_dept_ids)
+                queryset = Task.objects.filter(department_id__in=dept_ids)
+            else:
+                queryset = Task.objects.filter(department=request.user.department)
+        else:
+            queryset = Task.objects.filter(assignee=request.user)
+
+        # 이번 주 통계
+        total_tasks = queryset.count()
+        in_progress_tasks = queryset.filter(status="IN_PROGRESS").count()
+        completed_tasks = queryset.filter(status="DONE").count()
+        delayed_tasks = queryset.filter(
+            due_date__date__lt=today,
+            status__in=["TODO", "IN_PROGRESS"]
+        ).count()
+
+        # 지난 주 통계
+        last_week_queryset = queryset.filter(created_at__date__lte=last_week)
+        last_week_total = last_week_queryset.count()
+        last_week_in_progress = last_week_queryset.filter(status="IN_PROGRESS").count()
+        last_week_completed = last_week_queryset.filter(status="DONE").count()
+        last_week_delayed = last_week_queryset.filter(
+            due_date__date__lt=last_week,
+            status__in=["TODO", "IN_PROGRESS"]
+        ).count()
+
+        # 증감률 계산
+        def calculate_trend(current, previous):
+            if previous == 0:
+                return 100 if current > 0 else 0
+            return round(((current - previous) / previous) * 100, 1)
+
+        return Response({
+            "total": {
+                "count": total_tasks,
+                "trend": calculate_trend(total_tasks, last_week_total)
+            },
+            "in_progress": {
+                "count": in_progress_tasks,
+                "trend": calculate_trend(in_progress_tasks, last_week_in_progress)
+            },
+            "completed": {
+                "count": completed_tasks,
+                "trend": calculate_trend(completed_tasks, last_week_completed)
+            },
+            "delayed": {
+                "count": delayed_tasks,
+                "trend": calculate_trend(delayed_tasks, last_week_delayed)
+            }
+        })
 
 
 class TaskCommentViewSet(viewsets.ModelViewSet):

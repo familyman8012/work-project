@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "tasks.apps.TasksConfig",
     "notifications",
     "reports",
+    "activities",
 ]
 
 MIDDLEWARE = [
