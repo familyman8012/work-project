@@ -318,6 +318,56 @@ class UserViewSet(viewsets.ModelViewSet):
             "avg_score": round(avg_score, 2),
         })
 
+    def create(self, request, *args, **kwargs):
+        """직원 등록"""
+        if not (request.user.role == "ADMIN" or 
+                request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]):
+            return Response(
+                {"detail": "직원을 등록할 권한이 없습니다."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 사번 자동 생성 로직
+        last_employee = User.objects.order_by('-employee_id').first()
+        if last_employee and last_employee.employee_id.startswith('E'):
+            last_number = int(last_employee.employee_id[1:])
+            new_employee_id = f'E{str(last_number + 1).zfill(4)}'
+        else:
+            new_employee_id = 'E0001'
+        
+        # 사번 추가
+        request.data['employee_id'] = new_employee_id
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """직원 정보 수정"""
+        if not (request.user.role == "ADMIN" or 
+                request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]):
+            return Response(
+                {"detail": "직원 정보를 수정할 권한이 없습니다."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """직원 삭제 (비활성화)"""
+        if not (request.user.role == "ADMIN" or 
+                request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]):
+            return Response(
+                {"detail": "직원을 삭제할 권한이 없습니다."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        instance = self.get_object()
+        instance.is_active = False  # 실제 삭제 대신 비활성화
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class UserSearchViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
