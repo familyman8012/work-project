@@ -42,6 +42,7 @@ from tasks.views import (
 )
 from notifications.views import NotificationViewSet
 from accounts.auth_views import logout
+from reports.views import ReportViewSet
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
@@ -53,6 +54,7 @@ router.register(r"task-history", TaskHistoryViewSet)
 router.register(r"task-time-logs", TaskTimeLogViewSet)
 router.register(r"task-evaluations", TaskEvaluationViewSet)
 router.register(r"notifications", NotificationViewSet, basename="notification")
+router.register(r"reports", ReportViewSet, basename="report")
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/api/docs/", permanent=False)),
