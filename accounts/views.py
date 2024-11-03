@@ -48,6 +48,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = User.objects.select_related("department").filter(is_active=True)
         department_id = self.request.query_params.get('department')
+        include_child_depts = self.request.query_params.get('include_child_depts', 'true').lower() == 'true'
         rank = self.request.query_params.get('rank')
 
         # 일반 직원은 접근 불가
@@ -55,22 +56,19 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.none()
 
         # 부서 필터링 공통 함수
-        def get_department_users(dept_id):
-            """부서 ID를 받아서 해당 부서와 산하 팀의 모든 직원 ID 목록을 반환"""
+        def get_department_users(dept_id, include_children=True):
+            """
+            부서 ID를 받아서 해당 부서의 직원 ID 목록을 반환
+            include_children이 True인 경우 하위 부서 직원도 포함
+            """
             try:
                 dept = Department.objects.get(id=dept_id)
-                print(f"\n=== Department Filter Debug ===")
-                print(f"Selected Department: {dept.name}")
-                print(f"Parent ID: {dept.parent_id}")
                 
-                if dept.parent is None:  # 본부인 경우
-                    # 본부와 산하 팀의 모든 직원
+                if dept.parent is None and include_children:  # 본부이고 하위부서 포함이 true인 경우
                     child_depts = Department.objects.filter(parent=dept.id)
                     dept_ids = [dept.id] + list(child_depts.values_list('id', flat=True))
-                    print(f"Child Departments: {[d.name for d in child_depts]}")
-                    print(f"Department IDs: {dept_ids}")
                     return dept_ids
-                else:  # 팀인 경우
+                else:  # 팀이거나 하위부서 포함이 false인 경우
                     return [dept.id]
             except Department.DoesNotExist:
                 return []
@@ -78,15 +76,28 @@ class UserViewSet(viewsets.ModelViewSet):
         # 사용자 권한별 처리
         if user.role == "ADMIN":
             if department_id:
-                dept_ids = get_department_users(department_id)
-                if dept_ids:
-                    print(f"Admin - Filtering by departments: {dept_ids}")
+                try:
+                    dept_ids = get_department_users(
+                        int(department_id), 
+                        include_children=include_child_depts
+                    )
                     queryset = queryset.filter(department_id__in=dept_ids)
+                    
+                    print(f"\n=== Department Filter Debug ===")
+                    print(f"Department ID: {department_id}")
+                    print(f"Include Children: {include_child_depts}")
+                    print(f"Resulting dept_ids: {dept_ids}")
+                    
+                except Department.DoesNotExist:
+                    return User.objects.none()
 
         elif user.rank in ["GENERAL_MANAGER", "DIRECTOR"]:
             if user.department.parent is None:  # 본부장/이사가 본부 소속인 경우
                 if department_id:
-                    dept_ids = get_department_users(department_id)
+                    dept_ids = get_department_users(
+                        int(department_id),
+                        include_children=include_child_depts
+                    )
                     if dept_ids:
                         print(f"Director/GM - Filtering by departments: {dept_ids}")
                         queryset = queryset.filter(department_id__in=dept_ids)
@@ -116,8 +127,6 @@ class UserViewSet(viewsets.ModelViewSet):
         print(f"Final Query: {queryset.query}")
         print(f"Result Count: {queryset.count()}")
         
-        # 본부 소속 직원이 먼저 나오도록 정렬하고, 같은 팀 내에서는 직급 순으로 정렬
-        # CASE문을 사용하여 직급 순서 정의
         return queryset.order_by(
             "-department__parent_id",  # NULL(본부)이 먼저 오도록 내림차순 정렬
             "department__name",        # 부서명으로 정렬
