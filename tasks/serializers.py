@@ -144,14 +144,12 @@ class TaskEvaluationSerializer(serializers.ModelSerializer):
         source="evaluator.username", read_only=True
     )
     task = TaskSerializer(read_only=True)
-    task_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = TaskEvaluation
         fields = [
             "id",
             "task",
-            "task_id",
             "evaluator",
             "evaluator_name",
             "difficulty",
@@ -162,11 +160,9 @@ class TaskEvaluationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "evaluator", "created_at"]
 
     def create(self, validated_data):
-        if "task" not in validated_data:
-            raise serializers.ValidationError(
-                {"task": "This field is required."}
-            )
-        return super().create(validated_data)
+        task_id = self.context["request"].data.get("task")
+        task = Task.objects.get(id=task_id)
+        return TaskEvaluation.objects.create(task=task, **validated_data)
 
 
 class TaskCalendarSerializer(serializers.ModelSerializer):
