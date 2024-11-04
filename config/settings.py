@@ -74,6 +74,15 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# 운영 환경 설정
+if not DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "https://your-production-domain.com"
+    ]
+    
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 # CORS 추가 설정
 CORS_ALLOW_METHODS = [
     "DELETE",
