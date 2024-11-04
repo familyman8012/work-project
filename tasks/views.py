@@ -72,18 +72,34 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Task.objects.select_related("department", "assignee").all()
+        user = self.request.user
 
-        # 부서 필터링 로직
+        # 단일 작업 조회 (retrieve)인 경우
+        if self.action == "retrieve":
+            return queryset
+
+        # 목록 조회 (list)인 경우
         department_id = self.request.query_params.get("department")
+        assignee_id = self.request.query_params.get("assignee")
+
+        # assignee_id가 있는 경우 (특정 사용자의 작업 조회)
+        if assignee_id:
+            queryset = queryset.filter(assignee_id=assignee_id)
+            # 본부장/이사는 모든 직원의 작업을 볼 수 있음
+            if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                return queryset
+            # 팀장은 자신의 팀원의 작업만 볼 수 있음
+            elif user.role == "MANAGER":
+                return queryset.filter(department=user.department)
+            # 일반 직원은 자신의 작업만 볼 수 있음
+            else:
+                return queryset.filter(assignee=user)
+
+        # 부서 필터링
         if department_id:
             try:
                 department_id = int(department_id)
                 selected_dept = Department.objects.get(id=department_id)
-
-                print(f"\n=== Department Filter Debug ===")
-                print(f"Selected Department ID: {department_id}")
-                print(f"Selected Department: {selected_dept.name}")
-                print(f"Is HQ? {selected_dept.parent is None}")
 
                 if selected_dept.parent is None:  # 본부인 경우
                     child_depts = Department.objects.filter(
@@ -92,29 +108,32 @@ class TaskViewSet(viewsets.ModelViewSet):
                     dept_ids = [department_id] + list(
                         child_depts.values_list("id", flat=True)
                     )
-
-                    print(
-                        f"Child Departments: {[d.name for d in child_depts]}"
-                    )
-                    print(f"All Department IDs: {dept_ids}")
-
-                    # 각 부서별 작업 수 먼저 확인
-                    for dept_id in dept_ids:
-                        dept_tasks = Task.objects.filter(department_id=dept_id)
-                        print(f"Tasks in dept {dept_id}: {dept_tasks.count()}")
-
                     queryset = queryset.filter(department_id__in=dept_ids)
                 else:
                     queryset = queryset.filter(department_id=department_id)
 
-                # 최종 리셋 결과 확인
-                print(f"Final queryset count: {queryset.count()}")
-                print(f"SQL Query: {queryset.query}")
-                print("=== End Debug ===\n")
-
             except (Department.DoesNotExist, ValueError) as e:
                 print(f"Error: {e}")
                 return Task.objects.none()
+
+        # 일반적인 작업 목록 조회 (assignee_id가 없고 department_id도 없는 경우)
+        elif user.role != "ADMIN":
+            if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                if (
+                    user.department.parent is None
+                ):  # 본부장/이사가 본부 소속인 경우
+                    dept_ids = [user.department.id]
+                    child_dept_ids = Department.objects.filter(
+                        parent=user.department
+                    ).values_list("id", flat=True)
+                    dept_ids.extend(child_dept_ids)
+                    queryset = queryset.filter(department_id__in=dept_ids)
+                else:  # 팀 소속인 경우
+                    queryset = queryset.filter(department=user.department)
+            elif user.role == "MANAGER":
+                queryset = queryset.filter(department=user.department)
+            else:
+                queryset = queryset.filter(assignee=user)
 
         # 검색어 처리
         search = self.request.query_params.get("search", "")
@@ -183,7 +202,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def paginate_queryset(self, queryset):
-        # 페이지네이션 결과 ��깅
+        # 페이지네이션 결과 깅
         page = super().paginate_queryset(queryset)
         if page is not None:
             print(f"Page size: {len(page)}")
@@ -458,7 +477,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         user = request.user
         today = timezone.now().date()
 
-        # 기본 쿼셋 (마감일이 오늘 이전이고 직 완료되지 않�� 작업)
+        # 기본 쿼셋 (마감일이 오늘 이전이고 직 완료되지 않 작업)
         queryset = Task.objects.filter(
             due_date__date__lt=today,  # 마감일이 오늘 이전인 작업
             status__in=["TODO", "IN_PROGRESS", "REVIEW"],  # 완료되지 않은 작업
@@ -487,7 +506,7 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="workload-stats")
     def workload_stats(self, request):
-        """작 부��� 통계"""
+        """작 부 통계"""
         today = timezone.now().date()
         start_date = today - timedelta(days=7)
 
@@ -660,7 +679,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         # 각 팀원별 성과 계산
         performance_data = []
         for member in team_members:
-            # 전체 작업 수와 완료된 작업 수 계산
+            # 전체 작업 수와 완료된 작업 수 계
             member_tasks = Task.objects.filter(assignee=member)
             total_tasks = member_tasks.count()
             completed_tasks = member_tasks.filter(status="DONE").count()
@@ -697,7 +716,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="recent")
     def recent_activities(self, request):
         """최근 작업 활동 내역"""
-        # 권한에 따른 쿼리셋 필터링
+        # 한에 따른 쿼리셋 터링
         if request.user.role == "ADMIN":
             queryset = TaskHistory.objects.all()
         elif request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
@@ -785,7 +804,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             due_date__date__lt=today, status__in=["TODO", "IN_PROGRESS"]
         ).count()
 
-        # 지난 주 통계
+        # 지��� 주 통계
         last_week_queryset = queryset.filter(created_at__date__lte=last_week)
         last_week_total = last_week_queryset.count()
         last_week_in_progress = last_week_queryset.filter(

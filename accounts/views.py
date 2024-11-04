@@ -40,6 +40,25 @@ class StandardResultsSetPagination(PageNumberPagination):
         )
 
 
+def get_department_users(
+    department_id: int, include_children: bool = True
+) -> list:
+    """
+    부서 ID를 받아서 해당 부서와 하위 부서의 ID 목록을 반환
+    """
+    try:
+        department = Department.objects.get(id=department_id)
+        dept_ids = [department_id]
+
+        if include_children and department.parent is None:  # 본부인 경우
+            child_depts = Department.objects.filter(parent=department_id)
+            dept_ids.extend(child_depts.values_list("id", flat=True))
+
+        return dept_ids
+    except Department.DoesNotExist:
+        return []
+
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -64,74 +83,19 @@ class UserViewSet(viewsets.ModelViewSet):
         if user.role == "EMPLOYEE":
             return User.objects.none()
 
-        # 부서 필터링 공통 함수
-        def get_department_users(dept_id, include_children=True):
-            """
-            부서 ID를 받아서 해당 부서의 직원 ID 목록을 반환
-            include_children이 True인 경우 하위 부서 직원도 포함
-            """
-            try:
-                dept = Department.objects.get(id=dept_id)
-
-                if (
-                    dept.parent is None and include_children
-                ):  # 본부이고 하위부서 포함이 true인 경우
-                    child_depts = Department.objects.filter(parent=dept.id)
-                    dept_ids = [dept.id] + list(
-                        child_depts.values_list("id", flat=True)
-                    )
-                    return dept_ids
-                else:  # 팀이거나 하위부서 포함이 false인 경우
-                    return [dept.id]
-            except Department.DoesNotExist:
-                return []
-
         # 사용자 권한별 처리
         if user.role == "ADMIN":
-            if department_id:
-                try:
-                    dept_ids = get_department_users(
-                        int(department_id),
-                        include_children=include_child_depts,
-                    )
-                    queryset = queryset.filter(department_id__in=dept_ids)
-
-                    print(f"\n=== Department Filter Debug ===")
-                    print(f"Department ID: {department_id}")
-                    print(f"Include Children: {include_child_depts}")
-                    print(f"Resulting dept_ids: {dept_ids}")
-
-                except Department.DoesNotExist:
-                    return User.objects.none()
-
+            pass  # 관리자는 모든 사용자 조회 가능
         elif user.rank in ["GENERAL_MANAGER", "DIRECTOR"]:
-            if (
-                user.department.parent is None
-            ):  # 본부장/이사가 본부 소속인 경우
-                if department_id:
-                    dept_ids = get_department_users(
-                        int(department_id),
-                        include_children=include_child_depts,
-                    )
-                    if dept_ids:
-                        print(
-                            "Director/GM - Filtering by departments:"
-                            f" {dept_ids}"
-                        )
-                        queryset = queryset.filter(department_id__in=dept_ids)
-                else:
-                    # 자신의 본부 전체 직원
-                    dept_ids = get_department_users(user.department.id)
-                    print(f"Director/GM - Default departments: {dept_ids}")
-                    queryset = queryset.filter(department_id__in=dept_ids)
-
+            # 본부장/이사는 모든 사용자 조회 가능
+            pass
         elif user.role == "MANAGER":
+            # 팀장은 자신의 팀원만 조회 가능
             queryset = queryset.filter(department=user.department)
 
         # 검색어 처리
         search = self.request.query_params.get("search")
         if search:
-            # 전체 이름으로 검색하기 위한 full_name 어노테이션
             queryset = queryset.annotate(
                 full_name=Concat(
                     "last_name",
@@ -147,20 +111,23 @@ class UserViewSet(viewsets.ModelViewSet):
             query |= Q(employee_id__icontains=search)  # 사번으로 검색
             query |= Q(email__icontains=search)  # 이메일로 검색
 
-            # 디버깅을 위한 로그 추가
-            print(f"Search term: {search}")
-            print(f"Generated query: {query}")
-
             # 최종 필터링 적용
             queryset = queryset.filter(query)
-            print(f"Final SQL: {queryset.query}")
 
         # rank 필터링 추가
         if rank:
             queryset = queryset.filter(rank=rank)
 
-        print(f"Final Query: {queryset.query}")
-        print(f"Result Count: {queryset.count()}")
+        # 부서 필터링 (선택적)
+        if department_id:
+            try:
+                dept_ids = get_department_users(
+                    int(department_id), include_children=include_child_depts
+                )
+                if dept_ids:
+                    queryset = queryset.filter(department_id__in=dept_ids)
+            except Department.DoesNotExist:
+                return User.objects.none()
 
         return queryset.order_by(
             "-department__parent_id",  # NULL(본부)이 먼저 오도록 내림차순 정렬
@@ -230,6 +197,28 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def tasks_statistics(self, request, pk=None):
         user = self.get_object()
+        current_user = request.user
+
+        # 권한 체크
+        if current_user.role == "ADMIN":
+            pass  # 관리자는 모든 접근 가능
+        elif current_user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            pass  # 본부장/이사도 모든 접근 가능
+        elif current_user.role == "MANAGER":
+            # 팀장은 자신의 팀원만 조회 가능
+            if user.department != current_user.department:
+                return Response(
+                    {"detail": "접근 권한이 없습니다."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        else:
+            # 일반 직원은 자신의 정보만 조회 가능
+            if user.id != current_user.id:
+                return Response(
+                    {"detail": "접근 권한이 없습니다."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
@@ -268,6 +257,28 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def tasks_statistics_detail(self, request, pk=None):
         user = self.get_object()
+        current_user = request.user
+
+        # 권한 체크
+        if current_user.role == "ADMIN":
+            pass  # 관리자는 모든 접근 가능
+        elif current_user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            pass  # 본부장/이사도 모든 접근 가능
+        elif current_user.role == "MANAGER":
+            # 팀장은 자신의 팀원만 조회 가능
+            if user.department != current_user.department:
+                return Response(
+                    {"detail": "접근 권한이 없습니다."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        else:
+            # 일반 직원은 자신의 정보만 조회 가능
+            if user.id != current_user.id:
+                return Response(
+                    {"detail": "접근 권한이 없습니다."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
@@ -293,7 +304,7 @@ class UserViewSet(viewsets.ModelViewSet):
             "EASY": tasks.filter(difficulty="EASY").count(),
         }
 
-        # 평균 작업 완��� 시간 (완료된 작업만)
+        # 평균 작업 완료 시간 (완료된 작업만)
         completed_tasks = tasks.filter(
             status="DONE", completed_at__isnull=False
         )
@@ -392,7 +403,7 @@ class UserViewSet(viewsets.ModelViewSet):
             or request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]
         ):
             return Response(
-                {"detail": "직원 정보를 수정할 권한이 없습니다."},
+                {"detail": "직원 정보를 수할 권한이 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
