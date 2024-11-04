@@ -14,7 +14,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.pagination import PageNumberPagination
 from organizations.models import Department
-from django.db.models import Case, When, IntegerField
+from django.db.models import Case, When, IntegerField, CharField
+from django.db.models.functions import Concat
+from django.db.models import Value
 
 # Create your views here.
 
@@ -28,12 +30,14 @@ class StandardResultsSetPagination(PageNumberPagination):
     max_page_size = 100
 
     def get_paginated_response(self, data):
-        return Response({
-            'count': self.page.paginator.count,  # 전체 결과 수
-            'next': self.get_next_link(),
-            'previous': self.get_previous_link(),
-            'results': data
-        })
+        return Response(
+            {
+                "count": self.page.paginator.count,  # 전체 결과 수
+                "next": self.get_next_link(),
+                "previous": self.get_previous_link(),
+                "results": data,
+            }
+        )
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -41,15 +45,20 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["first_name", "last_name", "employee_id", "email"]
 
     def get_queryset(self):
         user = self.request.user
-        queryset = User.objects.select_related("department").filter(is_active=True)
-        department_id = self.request.query_params.get('department')
-        include_child_depts = self.request.query_params.get('include_child_depts', 'true').lower() == 'true'
-        rank = self.request.query_params.get('rank')
+        queryset = User.objects.select_related("department").filter(
+            is_active=True
+        )
+        department_id = self.request.query_params.get("department")
+        include_child_depts = (
+            self.request.query_params.get(
+                "include_child_depts", "true"
+            ).lower()
+            == "true"
+        )
+        rank = self.request.query_params.get("rank")
 
         # 일반 직원은 접근 불가
         if user.role == "EMPLOYEE":
@@ -63,10 +72,14 @@ class UserViewSet(viewsets.ModelViewSet):
             """
             try:
                 dept = Department.objects.get(id=dept_id)
-                
-                if dept.parent is None and include_children:  # 본부이고 하위부서 포함이 true인 경우
+
+                if (
+                    dept.parent is None and include_children
+                ):  # 본부이고 하위부서 포함이 true인 경우
                     child_depts = Department.objects.filter(parent=dept.id)
-                    dept_ids = [dept.id] + list(child_depts.values_list('id', flat=True))
+                    dept_ids = [dept.id] + list(
+                        child_depts.values_list("id", flat=True)
+                    )
                     return dept_ids
                 else:  # 팀이거나 하위부서 포함이 false인 경우
                     return [dept.id]
@@ -78,28 +91,33 @@ class UserViewSet(viewsets.ModelViewSet):
             if department_id:
                 try:
                     dept_ids = get_department_users(
-                        int(department_id), 
-                        include_children=include_child_depts
+                        int(department_id),
+                        include_children=include_child_depts,
                     )
                     queryset = queryset.filter(department_id__in=dept_ids)
-                    
+
                     print(f"\n=== Department Filter Debug ===")
                     print(f"Department ID: {department_id}")
                     print(f"Include Children: {include_child_depts}")
                     print(f"Resulting dept_ids: {dept_ids}")
-                    
+
                 except Department.DoesNotExist:
                     return User.objects.none()
 
         elif user.rank in ["GENERAL_MANAGER", "DIRECTOR"]:
-            if user.department.parent is None:  # 본부장/이사가 본부 소속인 경우
+            if (
+                user.department.parent is None
+            ):  # 본부장/이사가 본부 소속인 경우
                 if department_id:
                     dept_ids = get_department_users(
                         int(department_id),
-                        include_children=include_child_depts
+                        include_children=include_child_depts,
                     )
                     if dept_ids:
-                        print(f"Director/GM - Filtering by departments: {dept_ids}")
+                        print(
+                            "Director/GM - Filtering by departments:"
+                            f" {dept_ids}"
+                        )
                         queryset = queryset.filter(department_id__in=dept_ids)
                 else:
                     # 자신의 본부 전체 직원
@@ -113,12 +131,29 @@ class UserViewSet(viewsets.ModelViewSet):
         # 검색어 처리
         search = self.request.query_params.get("search")
         if search:
-            queryset = queryset.filter(
-                Q(first_name__icontains=search)
-                | Q(last_name__icontains=search)
-                | Q(employee_id__icontains=search)
-                | Q(email__icontains=search)
+            # 전체 이름으로 검색하기 위한 full_name 어노테이션
+            queryset = queryset.annotate(
+                full_name=Concat(
+                    "last_name",
+                    "first_name",
+                    output_field=CharField(),
+                )
             )
+
+            # 검색 조건 구성
+            query = Q(full_name__icontains=search)  # 전체 이름으로 검색
+            query |= Q(last_name__icontains=search)  # 성으로 검색
+            query |= Q(first_name__icontains=search)  # 이름으로 검색
+            query |= Q(employee_id__icontains=search)  # 사번으로 검색
+            query |= Q(email__icontains=search)  # 이메일로 검색
+
+            # 디버깅을 위한 로그 추가
+            print(f"Search term: {search}")
+            print(f"Generated query: {query}")
+
+            # 최종 필터링 적용
+            queryset = queryset.filter(query)
+            print(f"Final SQL: {queryset.query}")
 
         # rank 필터링 추가
         if rank:
@@ -126,11 +161,11 @@ class UserViewSet(viewsets.ModelViewSet):
 
         print(f"Final Query: {queryset.query}")
         print(f"Result Count: {queryset.count()}")
-        
+
         return queryset.order_by(
             "-department__parent_id",  # NULL(본부)이 먼저 오도록 내림차순 정렬
-            "department__name",        # 부서명으로 정렬
-            Case(                      # 직급 순서 정의
+            "department__name",  # 부서명으로 정렬
+            Case(  # 직급 순서 정의
                 When(rank="DIRECTOR", then=0),
                 When(rank="GENERAL_MANAGER", then=1),
                 When(rank="DEPUTY_GENERAL_MANAGER", then=2),
@@ -141,7 +176,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 default=7,
                 output_field=IntegerField(),
             ),
-            "first_name"              # 마지막으로 이름순
+            "first_name",  # 마지막으로 이름순
         )
 
     def get_serializer_class(self):
@@ -151,7 +186,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        
+
         # 페이지네이션 적용
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -258,8 +293,10 @@ class UserViewSet(viewsets.ModelViewSet):
             "EASY": tasks.filter(difficulty="EASY").count(),
         }
 
-        # 평균 작업 완료 시간 (완료된 작업만)
-        completed_tasks = tasks.filter(status="DONE", completed_at__isnull=False)
+        # 평균 작업 완��� 시간 (완료된 작업만)
+        completed_tasks = tasks.filter(
+            status="DONE", completed_at__isnull=False
+        )
         avg_completion_time = 0
         if completed_tasks.exists():
             total_hours = sum(
@@ -272,7 +309,9 @@ class UserViewSet(viewsets.ModelViewSet):
         # 지연된 작업 비율
         total_tasks = tasks.count()
         delayed_tasks = len([task for task in tasks if task.is_delayed])
-        delay_rate = (delayed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+        delay_rate = (
+            (delayed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+        )
 
         # 월별 통계
         monthly_stats = {}
@@ -285,7 +324,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     "delayed": 0,
                     "avg_completion_time": 0,
                 }
-            
+
             monthly_stats[month_key]["total"] += 1
             if task.status == "DONE":
                 monthly_stats[month_key]["completed"] += 1
@@ -294,8 +333,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
         # 평균 점수 계산 (평가가 있는 완료된 작업만)
         completed_tasks_with_eval = tasks.filter(
-            status="DONE",
-            evaluations__isnull=False
+            status="DONE", evaluations__isnull=False
         )
         avg_score = 0
         if completed_tasks_with_eval.exists():
@@ -306,38 +344,42 @@ class UserViewSet(viewsets.ModelViewSet):
             )
             avg_score = total_score / completed_tasks_with_eval.count()
 
-        return Response({
-            "priority_distribution": priority_distribution,
-            "difficulty_distribution": difficulty_distribution,
-            "avg_completion_time": round(avg_completion_time, 2),
-            "delay_rate": round(delay_rate, 2),
-            "monthly_stats": monthly_stats,
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks.count(),
-            "delayed_tasks": delayed_tasks,
-            "avg_score": round(avg_score, 2),
-        })
+        return Response(
+            {
+                "priority_distribution": priority_distribution,
+                "difficulty_distribution": difficulty_distribution,
+                "avg_completion_time": round(avg_completion_time, 2),
+                "delay_rate": round(delay_rate, 2),
+                "monthly_stats": monthly_stats,
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_tasks.count(),
+                "delayed_tasks": delayed_tasks,
+                "avg_score": round(avg_score, 2),
+            }
+        )
 
     def create(self, request, *args, **kwargs):
-        """직원 등록"""
-        if not (request.user.role == "ADMIN" or 
-                request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]):
+        """등록"""
+        if not (
+            request.user.role == "ADMIN"
+            or request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]
+        ):
             return Response(
-                {"detail": "직원을 등록할 권한이 없습니다."}, 
-                status=status.HTTP_403_FORBIDDEN
+                {"detail": "직원을 등록할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         # 사번 자동 생성 로직
-        last_employee = User.objects.order_by('-employee_id').first()
-        if last_employee and last_employee.employee_id.startswith('E'):
+        last_employee = User.objects.order_by("-employee_id").first()
+        if last_employee and last_employee.employee_id.startswith("E"):
             last_number = int(last_employee.employee_id[1:])
-            new_employee_id = f'E{str(last_number + 1).zfill(4)}'
+            new_employee_id = f"E{str(last_number + 1).zfill(4)}"
         else:
-            new_employee_id = 'E0001'
-        
+            new_employee_id = "E0001"
+
         # 사번 추가
-        request.data['employee_id'] = new_employee_id
-        
+        request.data["employee_id"] = new_employee_id
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -345,24 +387,28 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """직원 정보 수정"""
-        if not (request.user.role == "ADMIN" or 
-                request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]):
+        if not (
+            request.user.role == "ADMIN"
+            or request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]
+        ):
             return Response(
-                {"detail": "직원 정보를 수정할 권한이 없습니다."}, 
-                status=status.HTTP_403_FORBIDDEN
+                {"detail": "직원 정보를 수정할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         """직원 삭제 (비활성화)"""
-        if not (request.user.role == "ADMIN" or 
-                request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]):
+        if not (
+            request.user.role == "ADMIN"
+            or request.user.rank in ["DIRECTOR", "GENERAL_MANAGER"]
+        ):
             return Response(
-                {"detail": "직원을 삭제할 권한이 없습니다."}, 
-                status=status.HTTP_403_FORBIDDEN
+                {"detail": "직원을 삭제할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         instance = self.get_object()
         instance.is_active = False  # 실제 삭제 대신 비활성화
         instance.save()

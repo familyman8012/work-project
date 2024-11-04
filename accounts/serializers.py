@@ -5,7 +5,9 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    department_name = serializers.CharField(source='department.name', read_only=True)
+    department_name = serializers.CharField(
+        source="department.name", read_only=True
+    )
 
     class Meta:
         model = User

@@ -56,7 +56,7 @@ router.register(r"task-time-logs", TaskTimeLogViewSet)
 router.register(r"task-evaluations", TaskEvaluationViewSet)
 router.register(r"notifications", NotificationViewSet, basename="notification")
 router.register(r"reports", ReportViewSet, basename="report")
-router.register(r'activities', ActivityViewSet, basename='activity')
+router.register(r"activities", ActivityViewSet, basename="activity")
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/api/docs/", permanent=False)),
