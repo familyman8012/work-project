@@ -244,7 +244,7 @@ AUTH_USER_MODEL = "accounts.User"
 # JWT 설정 수정
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        day=7
+        days=7
     ),  # 액세스 토큰 15분 //개발 편의성을 위해 임시로 1일로 설정
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # 리프레시 토큰 1일
     "ROTATE_REFRESH_TOKENS": True,  # 리프레시 토큰 재발급
