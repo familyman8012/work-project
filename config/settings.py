@@ -76,10 +76,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 # 운영 환경 설정
 if not DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        "https://your-production-domain.com"
-    ]
-    
+    CORS_ALLOWED_ORIGINS = ["https://your-production-domain.com"]
+
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
@@ -245,10 +243,12 @@ AUTH_USER_MODEL = "accounts.User"
 
 # JWT 설정 수정
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # 액세스 토큰 15분
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),    # 리프레시 토큰 1일
-    "ROTATE_REFRESH_TOKENS": True,                  # 리프레시 토큰 재발급
-    "BLACKLIST_AFTER_ROTATION": True,              # 이전 리프레시 토큰 블랙리스트 처리
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        day=7
+    ),  # 액세스 토큰 15분 //개발 편의성을 위해 임시로 1일로 설정
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # 리프레시 토큰 1일
+    "ROTATE_REFRESH_TOKENS": True,  # 리프레시 토큰 재발급
+    "BLACKLIST_AFTER_ROTATION": True,  # 이전 리프레시 토큰 블랙리스트 처리
     "UPDATE_LAST_LOGIN": False,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
@@ -263,21 +263,15 @@ SIMPLE_JWT = {
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True  # 개발 환경에서만!
     CORS_ALLOW_CREDENTIALS = True
-    CORS_ALLOW_HEADERS = [
-        '*'
-    ]
-    CORS_ALLOW_METHODS = [
-        '*'
-    ]
+    CORS_ALLOW_HEADERS = ["*"]
+    CORS_ALLOW_METHODS = ["*"]
 else:
-    CORS_ALLOWED_ORIGINS = [
-        "https://your-production-domain.com"
-    ]
+    CORS_ALLOWED_ORIGINS = ["https://your-production-domain.com"]
     CORS_ALLOW_CREDENTIALS = True
 
 # 쿠키 설정
-SESSION_COOKIE_SAMESITE = 'Lax'  # None, Lax, Strict
-CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = "Lax"  # None, Lax, Strict
+CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 
