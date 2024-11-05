@@ -44,6 +44,7 @@ from notifications.views import NotificationViewSet
 from accounts.auth_views import logout
 from reports.views import ReportViewSet
 from activities.views import ActivityViewSet
+from experiments.views import LLMAnalysisViewSet
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
@@ -57,6 +58,7 @@ router.register(r"task-evaluations", TaskEvaluationViewSet)
 router.register(r"notifications", NotificationViewSet, basename="notification")
 router.register(r"reports", ReportViewSet, basename="report")
 router.register(r"activities", ActivityViewSet, basename="activity")
+router.register(r"experiments/llm", LLMAnalysisViewSet, basename="llm")
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/api/docs/", permanent=False)),
