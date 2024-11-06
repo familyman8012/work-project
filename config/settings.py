@@ -251,55 +251,30 @@ AUTH_USER_MODEL = "accounts.User"
 
 # JWT 설정 추가
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        days=7
-    ),  # 액세스 토큰 15분 //개발 편의성을 위해 임시로 1일로 설정
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # 리프레시 토큰 1일
-    "ROTATE_REFRESH_TOKENS": True,  # 리프레시 토큰 재발급
-    "BLACKLIST_AFTER_ROTATION": True,  # 이전 리프레시 토큰 블랙리스트 처리
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=7),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "VERIFYING_KEY": None,
-    "AUDIENCE": None,
-    "ISSUER": None,
-    "JWK_URL": None,
-    "LEEWAY": 0,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
-    "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
-    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
-    "TOKEN_TYPE_CLAIM": "token_type",
-    "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
-    "JTI_CLAIM": "jti_hex",
+    "AUTH_COOKIE": "access_token",
+    "AUTH_COOKIE_DOMAIN": None,
+    "AUTH_COOKIE_SECURE": True,
+    "AUTH_COOKIE_HTTP_ONLY": True,
+    "AUTH_COOKIE_PATH": "/",
+    "AUTH_COOKIE_SAMESITE": "Lax",
 }
 
 # CORS 설정
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True  # 개발 환경에서만!
-    CORS_ALLOW_CREDENTIALS = True
-    CORS_ALLOW_HEADERS = ["*"]
-    CORS_ALLOW_METHODS = ["*"]
-else:
-    CORS_ALLOWED_ORIGINS = ["https://your-production-domain.com"]
-    CORS_ALLOW_CREDENTIALS = True
-
-# 쿠키 설정
-SESSION_COOKIE_SAMESITE = "Lax"  # None, Lax, Strict
-CSRF_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
-
-if DEBUG:
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
-    CSRF_COOKIE_SAMESITE = None  # 개발 환경에서는 None으로 설정
-    SESSION_COOKIE_SAMESITE = None
-else:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+CORS_ALLOW_CREDENTIALS = True
 
 # CORS 추가 설정
 CORS_ALLOW_METHODS = [
@@ -322,3 +297,18 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+
+# 쿠키 설정
+SESSION_COOKIE_SAMESITE = "Lax"  # None, Lax, Strict
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+
+if DEBUG:
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_SAMESITE = None  # 개발 환경에서는 None으로 설정
+    SESSION_COOKIE_SAMESITE = None
+else:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
