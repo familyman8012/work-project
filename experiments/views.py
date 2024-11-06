@@ -91,7 +91,7 @@ REMEMBER: Return ONLY the SQL query. Any other text will cause an error."""
             # Anthropic 모델 초기화
             llm = ChatAnthropic(
                 api_key=os.getenv("ANTHROPIC_API_KEY"),
-                model="claude-3-5-sonnet-20240620",
+                model="claude-3-haiku-20240307",
                 temperature=0.7,
                 streaming=True,
             )
@@ -130,8 +130,43 @@ REMEMBER: Return ONLY the SQL query. Any other text will cause an error."""
             # 쿼리 실행
             result = db.run(sql_query)
 
-            # 결과 포맷팅
-            formatted_result = self.format_result(question, result, sql_query)
+            # 결과를 LLM에게 전달하여 자연스러운 응답 생성
+            format_prompt = """You are a helpful assistant that formats database query results into natural Korean sentences.
+            
+Original question: {question}
+SQL query: {sql_query}
+Query result: {result}
+
+Rules:
+1. Respond in Korean only
+2. Keep the response concise but natural
+3. Include the numeric results in the response
+4. Match the tone of the response to the question
+5. If the result is 0 or empty, explain that no matching data was found
+6. Use appropriate Korean particles and honorifics
+
+Format the result into a natural Korean sentence:"""
+
+            llm = ChatAnthropic(
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                model="claude-3-5-sonnet-20240620",
+                temperature=0.7,
+                streaming=True,
+            )
+
+            response = llm.invoke(
+                [
+                    SystemMessage(content=format_prompt),
+                    HumanMessage(
+                        content=(
+                            f"Question: {question}\nSQL: {sql_query}\nResult:"
+                            f" {result}"
+                        )
+                    ),
+                ]
+            )
+
+            formatted_result = response.content
 
             return Response(
                 {
@@ -144,58 +179,3 @@ REMEMBER: Return ONLY the SQL query. Any other text will cause an error."""
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
-
-    def format_result(
-        self, question: str, result: list, sql_query: str
-    ) -> str:
-        """결과를 자연스러운 문장으로 변환"""
-
-        # COUNT 쿼리 결과 처리
-        if "COUNT(*)" in sql_query:
-            try:
-                # 결과가 [(n,)] 형태로 반환됨
-                if isinstance(result, list) and len(result) > 0:
-                    if (
-                        isinstance(result[0], (list, tuple))
-                        and len(result[0]) > 0
-                    ):
-                        count = result[0][0]
-                    else:
-                        count = result[0]  # 단일 값인 경우
-                else:
-                    count = 0
-
-                # 부서/팀 관련 질문
-                if "부서" in question or "팀" in question:
-                    if "본부" in question:
-                        return f"{count}명의 직원이 소속되어 있습니다."
-                    else:
-                        return f"현재 {count}명이 근무하고 있습니다."
-
-                return f"총 {count}건입니다."
-            except Exception as e:
-                print(f"결과 처리 중 오류 발생: {e}")
-                print(f"원본 결과: {result}")
-                return "결과를 처리할 수 없습니다."
-
-        # AVG 쿼리 결과 처리
-        if "AVG" in sql_query:
-            avg = result[0][0] if result and result[0] else 0
-            if "점수" in question or "평점" in question:
-                return f"평균 {avg:.1f}점입니다."
-            if "시간" in question:
-                return f"평균 {avg:.1f}시간이 소요됩니다."
-            return f"평균값은 {avg:.1f}입니다."
-
-        # 직원 정보 쿼리 결과 처리
-        if "last_name" in sql_query and "first_name" in sql_query:
-            if not result or not result[0]:
-                return "해당하는 직원이 없습니다."
-            name = result[0][0] if result[0][0] else "이름 없음"
-            dept = result[0][1] if len(result[0]) > 1 else ""
-            if "누구" in question:
-                return f"{dept} {name}입니다."
-            return f"{dept}의 {name} 직원입니다."
-
-        # 기본 결과 반환
-        return str(result)

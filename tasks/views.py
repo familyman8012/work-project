@@ -33,6 +33,7 @@ from django.db.models import Value, CharField
 from django.db.models.functions import Concat
 import math
 from django.db.models import Avg
+from rest_framework.permissions import IsAuthenticated
 
 User = get_user_model()
 
@@ -76,7 +77,29 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         # 단일 작업 조회 (retrieve)인 경우
         if self.action == "retrieve":
-            return queryset
+            # ADMIN은 모든 작업 접근 가능
+            if user.role == "ADMIN":
+                return queryset
+
+            # DIRECTOR/GENERAL_MANAGER는 본부 내 모든 작업 접근 가능
+            if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+                if user.department.parent is None:  # 본부장인 경우
+                    dept_ids = [user.department.id]
+                    child_dept_ids = Department.objects.filter(
+                        parent=user.department
+                    ).values_list("id", flat=True)
+                    dept_ids.extend(child_dept_ids)
+                    return queryset.filter(department_id__in=dept_ids)
+                else:  # 팀장인 경우
+                    return queryset.filter(department=user.department)
+
+            # MANAGER는 팀 내 작업만 접근 가능
+            elif user.role == "MANAGER":
+                return queryset.filter(department=user.department)
+
+            # EMPLOYEE는 자신의 작업만 접근 가능
+            else:
+                return queryset.filter(assignee=user)
 
         # 목록 조회 (list)인 경우
         department_id = self.request.query_params.get("department")
@@ -586,7 +609,7 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="upcoming-deadlines")
     def upcoming_deadlines(self, request):
-        """다가오는 마감일 작업"""
+        """다가오는 감일 작업"""
         today = timezone.now().date()
         end_date = today + timedelta(days=7)  # 일주일 이내 마감
 
@@ -804,7 +827,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             due_date__date__lt=today, status__in=["TODO", "IN_PROGRESS"]
         ).count()
 
-        # 지��� 주 통계
+        # 지 주 통계
         last_week_queryset = queryset.filter(created_at__date__lte=last_week)
         last_week_total = last_week_queryset.count()
         last_week_in_progress = last_week_queryset.filter(
@@ -959,30 +982,113 @@ class TaskTimeLogViewSet(viewsets.ModelViewSet):
 class TaskEvaluationViewSet(viewsets.ModelViewSet):
     queryset = TaskEvaluation.objects.all()
     serializer_class = TaskEvaluationSerializer
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["task__title"]  # 작업 제목으로 검색 가능
 
     def get_queryset(self):
-        queryset = TaskEvaluation.objects.select_related("task", "evaluator")
-
-        # 작업 ID로 필터
+        queryset = TaskEvaluation.objects.select_related(
+            "task",
+            "evaluator",
+            "task__department",  # department 정보도 함께 로드
+            "task__assignee",  # assignee 정보도 함께 로드
+        )
+        user = self.request.user
         task_id = self.request.query_params.get("task")
+
+        # task_id로 필터링
         if task_id:
             queryset = queryset.filter(task_id=task_id)
-        else:
-            # task_id가 없는 경우(목록 조회) 자신의 평가만 표시
-            queryset = queryset.filter(evaluator=self.request.user)
 
-        # 난이도로 필터링
-        difficulty = self.request.query_params.get("difficulty")
-        if difficulty:
-            queryset = queryset.filter(difficulty=difficulty)
+        # ADMIN은 모든 평가 조회 가능
+        if user.role == "ADMIN":
+            return queryset
 
-        return queryset.order_by("-created_at")
+        # DIRECTOR/GENERAL_MANAGER는 본부 내 평가만 조회 가능
+        if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if user.department.parent is None:  # 본부장인 경우
+                dept_ids = [user.department.id]
+                child_dept_ids = Department.objects.filter(
+                    parent=user.department
+                ).values_list("id", flat=True)
+                dept_ids.extend(child_dept_ids)
+                return queryset.filter(task__department_id__in=dept_ids)
+            else:  # 팀장인 경우
+                return queryset.filter(task__department=user.department)
+
+        # MANAGER는 팀 내 평가만 조회 가능
+        if user.role == "MANAGER":
+            return queryset.filter(task__department=user.department)
+
+        # EMPLOYEE는 자신의 작업에 대한 평가만 조회 가능
+        return queryset.filter(task__assignee=user)
 
     def perform_create(self, serializer):
-        serializer.save(evaluator=self.request.user)
+        user = self.request.user
+        task = Task.objects.get(id=self.request.data.get("task"))
+
+        # 평가 권한 체크
+        if not self.can_evaluate_task(user, task):
+            raise PermissionError("이 작업을 평가할 권한이 없습니다.")
+
+        serializer.save(evaluator=user)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        instance = self.get_object()
+
+        # 평가 수정 권한 체크
+        if not self.can_manage_evaluation(user, instance):
+            raise PermissionError("이 평가를 수정할 권한이 없습니다.")
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+
+        # 평가 삭제 권한 체크
+        if not self.can_manage_evaluation(user, instance):
+            raise PermissionError("이 평가를 삭제할 권한이 없습니다.")
+
+        instance.delete()
+
+    def can_evaluate_task(self, user, task):
+        """작업 평가 권한 체크"""
+        # EMPLOYEE는 평가 불가
+        if user.role == "EMPLOYEE":
+            return False
+
+        # ADMIN은 모든 작업 평가 가능
+        if user.role == "ADMIN":
+            return True
+
+        # DIRECTOR/GENERAL_MANAGER는 본부 내 작업 평가 가능
+        if user.rank in ["DIRECTOR", "GENERAL_MANAGER"]:
+            if user.department.parent is None:  # 본부장인 경우
+                return (
+                    task.department.id == user.department.id  # 직속 부서
+                    or task.department.parent_id
+                    == user.department.id  # 산하 팀
+                )
+            else:  # 팀장인 경우
+                return task.department.id == user.department.id
+
+        # MANAGER는 팀 내 작업만 평가 가능
+        if user.role == "MANAGER":
+            return task.department.id == user.department.id
+
+        return False
+
+    def can_manage_evaluation(self, user, evaluation):
+        """평가 수정/삭제 권한 체크"""
+        # 자신이 작성한 평가는 수정/삭제 가능
+        if evaluation.evaluator == user:
+            return True
+
+        # ADMIN은 모든 평가 관리 가능
+        if user.role == "ADMIN":
+            return True
+
+        return False
 
 
 # DashboardViewSet, UserSearchViewSet, ReportViewSet는 추가 요구사항에 따라 구현 필요

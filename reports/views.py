@@ -13,14 +13,30 @@ User = get_user_model()
 
 
 class ReportViewSet(viewsets.ViewSet):
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Task.objects.all()
+
+        # ADMIN과 DIRECTOR/GENERAL_MANAGER는 모든 보고서 접근 가능
+        if user.role == "ADMIN" or user.rank in [
+            "DIRECTOR",
+            "GENERAL_MANAGER",
+        ]:
+            return queryset
+
+        # MANAGER는 팀 보고서만 접근 가능
+        if user.role == "MANAGER":
+            return queryset.filter(department=user.department)
+
+        # EMPLOYEE는 자신의 보고서만 접근 가능
+        return queryset.filter(assignee=user)
+
     @action(detail=False, methods=["get"])
     def personal_report(self, request):
         user = request.user
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
-        employee_id = request.query_params.get(
-            "employee_id"
-        )  # 다른 직원 보고서 조회용
+        employee_id = request.query_params.get("employee_id")
 
         if not start_date or not end_date:
             return Response(
@@ -28,16 +44,29 @@ class ReportViewSet(viewsets.ViewSet):
                 status=400,
             )
 
-        # 권한 체크
+        # 다른 직원의 보고서를 조회하려는 경우 권한 체크
         if employee_id and employee_id != str(user.id):
             target_user = User.objects.get(id=employee_id)
-            if not self.can_view_employee_report(user, target_user):
+
+            # ADMIN과 DIRECTOR/GENERAL_MANAGER는 모든 보고서 접근 가능
+            if user.role == "ADMIN" or user.rank in [
+                "DIRECTOR",
+                "GENERAL_MANAGER",
+            ]:
+                report_user = target_user
+            # MANAGER는 자신의 팀원 보고서만 접근 가능
+            elif (
+                user.role == "MANAGER"
+                and target_user.department == user.department
+            ):
+                report_user = target_user
+            else:
                 return Response({"error": "권한이 없습니다."}, status=403)
-            report_user = target_user
         else:
             report_user = user
 
-        tasks = Task.objects.filter(
+        # 보고서 데이터 조회 로직
+        tasks = self.get_queryset().filter(
             assignee=report_user, created_at__range=[start_date, end_date]
         )
 
@@ -331,7 +360,7 @@ class ReportViewSet(viewsets.ViewSet):
             or 0
         )
 
-        # 팀 평균 평가 점��� 계산 (나를 제외한)
+        # 팀 평균 평가 점수 계산 (나를 제외한)
         team_evaluations = TaskEvaluation.objects.filter(
             task__in=team_completed_tasks
         )
