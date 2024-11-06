@@ -66,13 +66,13 @@ urlpatterns = [
     path("api/", include(router.urls)),
     path(
         "api/schema/",
-        SpectacularAPIView.as_view(permission_classes=[AllowAny]),
+        SpectacularAPIView.as_view(permission_classes=[]),
         name="schema",
     ),
     path(
         "api/docs/",
         SpectacularSwaggerView.as_view(
-            url_name="schema", permission_classes=[AllowAny]
+            url_name="schema", permission_classes=[]
         ),
         name="swagger-ui",
     ),

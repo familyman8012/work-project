@@ -224,13 +224,16 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Company Task Manager API",
     "DESCRIPTION": "API for managing company tasks and employee workflows",
     "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,  # /api/schema/ endpoint 직접 접근 허용
+    "SERVE_INCLUDE_SCHEMA": True,
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "filter": True,
     },
-    "SWAGGER_UI_DIST": "SIDECAR",
-    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
-    "REDOC_DIST": "SIDECAR",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": "/api/",
+    "SERVE_AUTHENTICATION": None,
+    "SERVE_PERMISSIONS": None,
     "SECURITY": [
         {
             "Bearer": {
