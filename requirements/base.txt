@@ -10,3 +10,5 @@ langchain
 langchain-community
 anthropic
 python-dotenv
+gunicorn==21.2.0
+whitenoise==6.6.0
